@@ -1,25 +1,15 @@
-# SyncPro PM Task MVP
+# LinnoProjact PM Command Dashboard
 
-SyncPro is a working MVP for the Technological PM assignment. It helps project managers track tasks across multiple enterprise client projects, identify blockers, and generate customer-safe status updates.
+LinnoProjact is a high-end, premium project management command center and Kanban workspace. It is designed to empower project managers to track delivery cadences, visualize task lifecycles, safely highlight blockers, and generate instant internal or customer-facing status updates with Gemini AI integrations.
 
-## What Is Included
+## Key Accomplishments & Features
 
-- Portfolio dashboard with active projects, open tasks, blockers, and completion reliability.
-- Project detail workspace with progress, owner, deadline, task table, blocker ledger, and PM next action.
-- Project and task create/edit flows with canonical status and priority values.
-- Customer/stakeholder view that hides internal notes and raw technical blocker details.
-- AI-assisted internal summaries and customer updates.
-- Submission page with product brief, workflow, UX trade-offs, and prompt log.
-- Local JSON persistence in `.data/syncpro-db.json`.
-- UX guidance panels and English/Hebrew language switching across the main product flow.
-
-For a full list of current capabilities and limits, see [SYNC_PRO_CAPABILITIES.md](SYNC_PRO_CAPABILITIES.md).
-
-## What Is Intentionally Excluded
-
-- Authentication, permissions, billing, notifications, integrations, and production database setup.
-- Complex resource planning or individual productivity tracking.
-- Deployment automation.
+- **Premium Responsive Sidebar:** Completely branded with `LinnoProjact LOGO.svg` and customized styled topbar for desktop and mobile viewports.
+- **Advanced Kanban Board:** Real-time physical drag-and-drop task lifecycles utilizing `dnd-kit`, communicating dynamically with PostgreSQL database states.
+- **Sleek Task Creation Workspace:** Option to mock audio recordings, attach images, and seamlessly search/assign project team members.
+- **Modernized Team Members Panel:** Responsive grid of modern glassmorphic card elements featuring unique random colorful gradient avatars, edit/delete options inside a custom 3-dots menu, a typed-confirmation modal for safe deletion, and an animated Direct Messaging portal.
+- **Smart Real-time Search & Filters:** Instant name/email search bar and dynamic role filtering in the Project Members panel.
+- **Dual-Pane AI Assistant:** Full-featured conversational project assistant providing internal summaries and safe status updates in Hebrew and English.
 
 ## Run Locally
 
@@ -32,28 +22,29 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-## Optional Gemini Setup
+## Configuration & Databases
 
-The app works without an API key. If `GEMINI_API_KEY` is set, the backend will call Gemini for the AI summary routes. If the key is missing or Gemini fails, SyncPro returns deterministic local fallback summaries so the demo remains usable end-to-end.
+The project is powered by a PostgreSQL 14+ database and an Express backend (`server.ts`).
 
-```bash
-cp .env.example .env
-# edit .env and set GEMINI_API_KEY if you want external AI generation
-npm run dev
-```
-
-## Demo Path
-
-1. Open the dashboard and review portfolio health.
-2. Open a project and inspect progress, blockers, and PM next action.
-3. Create or edit a task, including a blocked task with a blocker reason.
-4. Generate an internal AI summary and customer update from the project detail page.
-5. Open the customer view and confirm it shows safe stakeholder-facing information only.
-6. Open `/submission` to review the assignment brief and prompt log.
-
-## Verification Commands
+### Environment Variables (.env)
 
 ```bash
-npm run lint
-npm run build
+GEMINI_API_KEY="your-key"
+GEMINI_MODEL="gemini-1.5-flash"
+PORT=3000
 ```
+
+If the Gemini API key is missing or calls fail, LinnoProjact returns robust deterministic local fallbacks so the application remains fully functional end-to-end.
+
+## Demo Sequence
+
+1. **Dashboard & Portfolio:** View active projects, overall completion progress, and blocker logs.
+2. **Project Detail Space:** Check team progress, next actions, and the Kanban board.
+3. **Task Manipulation:** Drag and drop tasks across columns in real-time or add a task with image/voice attachments.
+4. **Smart Assistant:** Fire quick prompts or custom chat messages to get detailed breakdowns of bottlenecks.
+5. **Team Management:** Search, filter, or manage participants in the redesigned grid cards. Check the safe delete verification popup!
+6. **Customer Portal:** Verify that the customer view cleanly filters out internal details.
+
+---
+
+For technical specifications and constraints, please review [LINNO_PROJACT_CAPABILITIES.md](LINNO_PROJACT_CAPABILITIES.md).
