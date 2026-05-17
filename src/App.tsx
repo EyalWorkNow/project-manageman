@@ -75,13 +75,7 @@ function Navigation({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () 
       {/* Logo */}
       <div className="px-5 py-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-white flex items-center justify-center shadow-sm">
-            <ShieldTick variant="Linear" color="currentColor" size={18} className="text-zinc-950" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-white tracking-tight">SyncPro</h1>
-            <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-[0.2em]">PM Command</p>
-          </div>
+          <img src="/logo.svg" alt="LinnoProjact Logo" className="h-7 object-contain" />
         </div>
         <button onClick={onClose} className="md:hidden text-zinc-500 hover:text-white transition-colors cursor-pointer">
           <CloseCircle variant="Linear" color="currentColor" size={18} />
@@ -197,10 +191,7 @@ function MobileTopBar({ onMenuOpen }: { onMenuOpen: () => void }) {
   return (
     <div className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-5 py-4 bg-zinc-950/80 backdrop-blur-xl border-b border-white/5">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm">
-          <ShieldTick variant="Linear" color="currentColor" size={16} className="text-zinc-950" />
-        </div>
-        <span className="text-base font-bold text-white tracking-tight">SyncPro</span>
+        <img src="/logo.svg" alt="LinnoProjact Logo" className="h-5 object-contain" />
       </div>
       <button onClick={onMenuOpen} className="text-zinc-400 hover:text-white transition-colors cursor-pointer p-1 bg-white/5 rounded-lg">
         <HambergerMenu variant="Linear" color="currentColor" size={18} />

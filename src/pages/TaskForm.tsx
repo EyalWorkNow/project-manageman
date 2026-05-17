@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft2, Save2, Refresh2, InfoCircle, Image as ImageIcon, Microphone2, Magicpen, CloseCircle, UserAdd, StopCircle, Play, Paperclip2 } from 'iconsax-react';
-import { Task, Project, TASK_PRIORITIES, TASK_STATUSES, STATUS_TRANSLATION_KEYS, PRIORITY_TRANSLATION_KEYS } from '../types';
+import { Task, Project, ProjectMember, TASK_PRIORITIES, TASK_STATUSES, STATUS_TRANSLATION_KEYS, PRIORITY_TRANSLATION_KEYS } from '../types';
 import { api } from '../services/api';
 import { cn } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
@@ -37,6 +37,7 @@ export default function TaskForm() {
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [taggedUsers, setTaggedUsers] = useState<string[]>([]);
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
 
   const toggleRecording = () => {
     if (isRecording) {
@@ -68,7 +69,7 @@ export default function TaskForm() {
     }
   };
 
-  const MOCK_USERS = ['Alex Rivera', 'Sarah Miller', 'James Chen', 'Dana Cohen'];
+  const MOCK_USERS = projectMembers.map(m => m.name);
 
   useEffect(() => {
     async function init() {
@@ -89,6 +90,14 @@ export default function TaskForm() {
     }
     init();
   }, [taskId]);
+
+  useEffect(() => {
+    if (formData.projectId) {
+      api.members.list(formData.projectId).then(setProjectMembers).catch(console.error);
+    } else {
+      setProjectMembers([]);
+    }
+  }, [formData.projectId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
