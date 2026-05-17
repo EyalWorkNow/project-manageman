@@ -64,9 +64,22 @@ type ValidationResult<T> =
 type ResponseLanguage = "en" | "he";
 
 
-const pool = new Pool({
-  database: "db_proxy_v2"
-});
+
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.DATABASE_SSL === "false" ? false : { rejectUnauthorized: false },
+      }
+    : {
+        database: process.env.PGDATABASE || "db_proxy_v2",
+        host: process.env.PGHOST,
+        port: process.env.PGPORT ? Number(process.env.PGPORT) : undefined,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+      }
+);
+
 
 function toIsoDate(value: Date | string | null | undefined) {
   if (!value) return "";
