@@ -263,7 +263,7 @@ export default function AiChat() {
           <div className={cn('flex items-center gap-3', isRTL && 'flex-row-reverse')}>
             <button
               onClick={() => window.history.back()}
-              className="btn-secondary w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 hover:bg-slate-100 transition-colors"
+              className="btn-secondary w-9 h-9 !p-0 rounded-xl flex items-center justify-center flex-shrink-0 hover:bg-slate-100 transition-colors text-zinc-700 hover:text-zinc-900"
               title={isRTL ? 'חזור' : 'Back'}
             >
               <ArrowLeft2 size={16} color="currentColor" className={isRTL ? 'rotate-180' : ''} />

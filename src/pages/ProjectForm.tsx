@@ -63,7 +63,7 @@ export default function ProjectForm() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="btn-secondary w-10 h-10 p-0 rounded-2xl flex items-center justify-center flex-shrink-0"
+            className="btn-secondary w-10 h-10 !p-0 rounded-2xl flex items-center justify-center flex-shrink-0 text-zinc-700 hover:text-zinc-900"
           >
             <ArrowLeft2 variant="Linear" color="currentColor" size={16} className={isRTL ? 'rotate-180' : ''} />
           </button>

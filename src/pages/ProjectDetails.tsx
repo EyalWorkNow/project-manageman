@@ -271,7 +271,7 @@ export default function ProjectDetails() {
           <div className={cn('flex items-center gap-3 min-w-0', isRTL && 'flex-row-reverse')}>
             <Link
               to="/"
-              className="btn-secondary w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+              className="btn-secondary w-9 h-9 !p-0 rounded-lg flex items-center justify-center flex-shrink-0 text-zinc-700 hover:text-zinc-900"
             >
               <ArrowLeft2 size={16} color="currentColor" className={isRTL ? 'rotate-180' : ''} />
             </Link>
