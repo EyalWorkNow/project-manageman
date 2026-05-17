@@ -198,27 +198,23 @@ export default function AiChat() {
             {isRTL ? 'הקשר זמין' : 'Available Context'}
           </p>
           <div className="space-y-2.5">
-            <ContextItem
-              icon={<Folder2 variant="Linear" color="currentColor" size={13} className="text-blue-500" />}
+            <ContextItem icon={<Folder2 variant="Linear" color="currentColor" size={13} className="text-blue-500" />}
               label={isRTL ? 'פרויקטים' : 'Projects'}
               value={systemStats ? `${systemStats.projects}` : '...'}
               color="blue"
             />
-            <ContextItem
-              icon={<ClipboardText variant="Linear" color="currentColor" size={13} className="text-violet-500" />}
+            <ContextItem icon={<ClipboardText variant="Linear" color="currentColor" size={13} className="text-violet-500" />}
               label={isRTL ? 'משימות' : 'Tasks'}
               value={systemStats ? `${systemStats.tasks}` : '...'}
               color="violet"
             />
-            <ContextItem
-              icon={<Warning2 variant="Linear" color="currentColor" size={13} className="text-amber-500" />}
+            <ContextItem icon={<Warning2 variant="Linear" color="currentColor" size={13} className="text-amber-500" />}
               label={isRTL ? 'חסומים' : 'Blocked'}
               value={systemStats ? `${systemStats.blocked}` : '...'}
               color={systemStats?.blocked ? 'amber' : 'green'}
               alert={!!systemStats?.blocked}
             />
-            <ContextItem
-              icon={<Data variant="Linear" color="currentColor" size={13} className="text-slate-400" />}
+            <ContextItem icon={<Data variant="Linear" color="currentColor" size={13} className="text-slate-400" />}
               label={isRTL ? 'מקור נתונים' : 'Data Source'}
               value={isRTL ? 'מקומי' : 'Local JSON'}
               color="slate"

@@ -225,29 +225,25 @@ export default function Dashboard() {
 
         {/* KPI Cards */}
         <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard
-            label={t('dash.active_projects')}
+          <KPICard label={t('dash.active_projects')}
             value={stats.active}
             icon={<Folder2 variant="Linear" color="currentColor" size={18} />}
             trend={isRTL ? `${projects.length} סה״כ` : `${projects.length} total`}
             description={isRTL ? 'מספר הפרויקטים שעדיין לא הסתיימו.' : 'Non-completed projects in the portfolio.'}
           />
-          <KPICard
-            label={t('dash.pending_tasks')}
+          <KPICard label={t('dash.pending_tasks')}
             value={stats.openTasks}
             icon={<Clock variant="Linear" color="currentColor" size={18} />}
             trend={isRTL ? `${stats.critical} קריטיות` : `${stats.critical} critical`}
             description={isRTL ? 'משימות פתוחות הדורשות טיפול.' : 'Open tasks still in the pipeline.'}
           />
-          <KPICard
-            label={t('dash.blocked_paths') || 'Blocked Paths'}
+          <KPICard label={t('dash.blocked_paths') || 'Blocked Paths'}
             value={stats.blocked}
             icon={<InfoCircle variant="Linear" color="currentColor" size={18} />}
             warning={stats.blocked > 0}
             description={isRTL ? 'משימות חסומות הדורשות פתרון דחוף.' : 'Tasks impeded — unblock to resume delivery.'}
           />
-          <KPICard
-            label={t('dash.reliability') || 'Reliability'}
+          <KPICard label={t('dash.reliability') || 'Reliability'}
             value={`${reliability}%`}
             icon={<TickCircle variant="Linear" color="currentColor" size={18} />}
             trend={isRTL ? `${stats.completed} בוצעו` : `${stats.completed} done`}

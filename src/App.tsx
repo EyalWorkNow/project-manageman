@@ -107,8 +107,7 @@ function Navigation({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () 
             {isRTL ? 'כלי AI' : 'AI Tools'}
           </p>
           <div className="space-y-0.5">
-            <NavLink
-              to="/ai-chat"
+            <NavLink to="/ai-chat"
               icon={<Messages2 variant="Linear" color="currentColor" size={17} />}
               label={isRTL ? 'צ׳אט AI' : 'AI Assistant'}
               highlight
