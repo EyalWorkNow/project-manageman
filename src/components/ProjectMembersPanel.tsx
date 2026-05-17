@@ -209,6 +209,10 @@ export default function ProjectMembersPanel({ projectId, members, onMembersChang
   const [contactMessage, setContactMessage] = useState('');
   const [messageSentStatus, setMessageSentStatus] = useState(false);
 
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedRole, setSelectedRole] = useState('All');
+
   async function handleAdd() {
     const name = addName.trim();
     const email = addEmail.trim();
@@ -261,6 +265,20 @@ export default function ProjectMembersPanel({ projectId, members, onMembersChang
       setMessageSentStatus(false);
     }, 2000);
   }
+
+  // Filter logic
+  const uniqueRoles = Array.from(new Set(members.map(m => m.title || 'Team Member').filter(Boolean)));
+  
+  const filteredMembers = members.filter(member => {
+    const matchesSearch = 
+      member.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      member.email.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const role = member.title || 'Team Member';
+    const matchesRole = selectedRole === 'All' || role === selectedRole;
+    
+    return matchesSearch && matchesRole;
+  });
 
   return (
     <div className="p-6 space-y-6">
@@ -373,6 +391,44 @@ export default function ProjectMembersPanel({ projectId, members, onMembersChang
         )}
       </AnimatePresence>
 
+      {/* Search & Filter Bar */}
+      {members.length > 0 && (
+        <div className={cn('flex flex-col sm:flex-row items-center gap-3 bg-zinc-50 border border-zinc-200/50 p-3 rounded-2xl', isRTL && 'sm:flex-row-reverse')}>
+          {/* Search Input */}
+          <div className="relative w-full sm:flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={isRTL ? 'חיפוש לפי שם או מייל...' : 'Search by name or email...'}
+              className={cn('w-full bg-white border border-zinc-200 rounded-xl py-2 pl-9 pr-4 text-xs outline-none focus:border-zinc-400 transition-colors', isRTL && 'pr-9 pl-4 text-right')}
+            />
+            <svg
+              className={cn("absolute top-3 w-4 h-4 text-zinc-400", isRTL ? "right-3" : "left-3")}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+
+          {/* Filter Dropdown */}
+          <div className="w-full sm:w-48">
+            <select
+              value={selectedRole}
+              onChange={e => setSelectedRole(e.target.value)}
+              className={cn('w-full bg-white border border-zinc-200 rounded-xl py-2 px-3 text-xs outline-none cursor-pointer focus:border-zinc-400 transition-colors', isRTL && 'text-right')}
+            >
+              <option value="All">{isRTL ? 'כל התפקידים' : 'All Roles'}</option>
+              {uniqueRoles.map(role => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Grid of Team Member Cards */}
       <div>
         {members.length === 0 ? (
@@ -385,9 +441,19 @@ export default function ProjectMembersPanel({ projectId, members, onMembersChang
               {isRTL ? 'הזמן את המשתתפים הראשונים כדי להתחיל לעבוד יחד.' : 'Invite team members to assign task ownership.'}
             </p>
           </div>
+        ) : filteredMembers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 bg-white border border-dashed border-zinc-200/60 rounded-3xl text-center">
+            <Profile2User size={42} color="#D4D9E3" variant="Bold" className="opacity-40" />
+            <p className="text-sm font-bold text-zinc-800 mt-4">
+              {isRTL ? 'לא נמצאו משתתפים' : 'No members found'}
+            </p>
+            <p className="text-xs text-zinc-400 mt-1 max-w-[280px]">
+              {isRTL ? 'נסה לחפש מונח אחר או שנה את סינון התפקידים.' : 'Try searching for something else or alter the role filter.'}
+            </p>
+          </div>
         ) : (
           <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {members.map(member => (
+            {filteredMembers.map(member => (
               <MemberCard
                 key={member.id}
                 member={member}
