@@ -47,6 +47,22 @@ app.use((req, _res, next) => {
   next();
 });
 
+let cachedLogoSvg: string | null = null;
+async function loadLogoSvg() {
+  if (cachedLogoSvg) return cachedLogoSvg;
+  try {
+    const logoPath = path.join(process.cwd(), "public", "logo.svg");
+    const raw = await fs.readFile(logoPath, "utf8");
+    // Keep only the <svg ...>...</svg> payload so we can inline it safely.
+    const start = raw.indexOf("<svg");
+    const end = raw.lastIndexOf("</svg>");
+    cachedLogoSvg = start >= 0 && end >= 0 ? raw.slice(start, end + "</svg>".length) : raw;
+  } catch {
+    cachedLogoSvg = null;
+  }
+  return cachedLogoSvg;
+}
+
 const geminiKey = process.env.GEMINI_API_KEY?.trim();
 const ai = geminiKey
   ? new GoogleGenAI({
@@ -1131,6 +1147,58 @@ app.get("/api/system/status", (_req, res) => {
     persistence: true,
     generatedAt: nowIso(),
   });
+});
+
+app.get("/api/og-image", async (req, res) => {
+  const origin =
+    (req.headers["x-forwarded-proto"] && req.headers["x-forwarded-host"])
+      ? `${String(req.headers["x-forwarded-proto"])}://${String(req.headers["x-forwarded-host"])}`
+      : `https://${req.headers.host || "project-manageman.vercel.app"}`;
+
+  const logo = await loadLogoSvg();
+  const logoMarkup = logo
+    ? `<g transform="translate(80,92) scale(0.55)">${logo}</g>`
+    : `<text x="80" y="170" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI" font-size="44" fill="#e6f0ff">LinnoProjact</text>`;
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07141f"/>
+      <stop offset="0.55" stop-color="#0a1b2b"/>
+      <stop offset="1" stop-color="#082a3b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#60a5fa"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="60" y="60" width="1080" height="510" rx="18" fill="#0b1f31" opacity="0.72" filter="url(#softShadow)"/>
+  <rect x="60" y="60" width="1080" height="510" rx="18" fill="none" stroke="rgba(255,255,255,0.12)"/>
+
+  ${logoMarkup}
+
+  <text x="80" y="320" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI" font-size="52" font-weight="700" fill="#e6f0ff">
+    PM Command Center
+  </text>
+  <text x="80" y="372" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI" font-size="28" fill="rgba(230,240,255,0.86)">
+    Kanban, Gantt, project health, and fast AI status updates.
+  </text>
+
+  <rect x="80" y="430" width="540" height="10" rx="5" fill="url(#accent)"/>
+  <text x="80" y="495" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI" font-size="22" fill="rgba(230,240,255,0.70)">
+    ${origin.replace(/&/g, "&amp;").replace(/</g, "&lt;")}
+  </text>
+</svg>`;
+
+  res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
+  res.send(svg);
 });
 
 app.get("/api/projects", async (_req, res) => {
