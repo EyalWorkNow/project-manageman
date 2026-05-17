@@ -1498,122 +1498,267 @@ Rules:
 
 // System stats endpoint for AI chat context panel
 app.get("/api/system/stats", async (_req, res) => {
+  const [allProjects, allTasks] = await Promise.all([getProjects(), getTasks()]);
+  const upcoming = allProjects
+    .filter(p => {
+      if (!p.deadline) return false;
+      const days = Math.ceil((new Date(p.deadline).getTime() - Date.now()) / 86400000);
+      return days >= 0 && days <= 14;
+    })
+    .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+    .slice(0, 3)
+    .map(p => ({ name: p.name, deadline: p.deadline, status: p.status }));
+
   res.json({
-    projects: (await getProjects()).length,
-    tasks: (await getTasks()).length,
-    blocked: (await getTasks()).filter((t) => t.isBlocked).length,
+    projects: allProjects.length,
+    tasks: allTasks.length,
+    blocked: allTasks.filter(t => t.isBlocked).length,
+    atRisk: allProjects.filter(p => p.status === "At Risk" || p.status === "Blocked").length,
+    onTrack: allProjects.filter(p => p.status === "On Track").length,
+    completed: allProjects.filter(p => p.status === "Completed").length,
+    upcomingDeadlines: upcoming,
   });
 });
 
-// AI Chat endpoint - answers PM questions using full project/task context
-app.post("/api/ai/chat", async (req, res) => {
-  const { message, language = "en" } = req.body as { message?: string; language?: ResponseLanguage };
-  if (!message || !message.trim()) return res.status(400).json({ error: "Message is required." });
+// ── AI Chat helpers ───────────────────────────────────────────────────────────
 
-  const responseLanguage: ResponseLanguage = language === "he" ? "he" : "en";
+type ChatHistoryTurn = { role: 'user' | 'assistant'; content: string };
 
-  const allProjects = await getProjects();
-  const allTasks = await getTasks();
+async function buildAiContext(projectId?: string) {
+  const [allProjects, allTasks] = await Promise.all([getProjects(), getTasks()]);
+  const atRiskProjects = allProjects.filter(p => p.status === "At Risk" || p.status === "Blocked");
 
-  const projectsSummary = allProjects.map(p => ({
-    id: p.id,
-    name: p.name,
-    client: p.clientName,
-    status: p.status,
-    manager: p.projectManager,
-    deadline: p.deadline,
-  }));
+  let projectContext = "";
+  if (projectId) {
+    const proj = allProjects.find(p => p.id === projectId);
+    const projTasks = allTasks.filter(t => t.projectId === projectId);
+    if (proj) {
+      const blocked = projTasks.filter(t => t.isBlocked);
+      const byStatus = (s: string) => projTasks.filter(t => t.status === s).length;
+      projectContext = `
 
-  const filteredTasks = allTasks.map(t => ({
-    id: t.id,
-    projectId: t.projectId,
-    title: t.title,
-    status: t.status,
-    priority: t.priority,
-    assignee: t.assignee,
-    dueDate: t.dueDate,
-    isBlocked: t.isBlocked,
-    blockerDescription: t.blockerDescription || undefined,
-  }));
+FOCUSED PROJECT:
+Name: ${proj.name} | Client: ${proj.clientName} | Status: ${proj.status}
+Manager: ${proj.projectManager} | Deadline: ${proj.deadline || "N/A"}
+Tasks: ${projTasks.length} total — To Do: ${byStatus("To Do")}, In Progress: ${byStatus("In Progress")}, Done: ${byStatus("Done")}, Blocked: ${byStatus("Blocked")}
+${blocked.length > 0 ? `Blocked tasks: ${blocked.map(t => `"${t.title}": ${t.blockerDescription || "no description"}`).join("; ")}` : "No blocked tasks."}
+Critical tasks: ${projTasks.filter(t => t.priority === "Critical" && t.status !== "Done").map(t => t.title).join(", ") || "none"}
+All tasks: ${projTasks.map(t => `${t.title} [${t.status}]`).join(", ")}`;
+    }
+  }
 
   const contextData = {
-    projects: projectsSummary,
-    tasks: filteredTasks,
+    projects: allProjects.map(p => ({ id: p.id, name: p.name, client: p.clientName, status: p.status, manager: p.projectManager, deadline: p.deadline })),
+    tasks: allTasks.map(t => ({ id: t.id, projectId: t.projectId, title: t.title, status: t.status, priority: t.priority, assignee: t.assignee, dueDate: t.dueDate, isBlocked: t.isBlocked, blockerDescription: t.blockerDescription || undefined })),
     summary: {
       totalProjects: allProjects.length,
       totalTasks: allTasks.length,
-      blockedTasks: allTasks.filter((t) => t.isBlocked).length,
+      blockedTasks: allTasks.filter(t => t.isBlocked).length,
       projectsByStatus: {
-        onTrack: allProjects.filter((p) => p.status === "On Track").length,
-        atRisk: allProjects.filter((p) => p.status === "At Risk").length,
-        blocked: allProjects.filter((p) => p.status === "Blocked").length,
-        completed: allProjects.filter((p) => p.status === "Completed").length,
+        onTrack: allProjects.filter(p => p.status === "On Track").length,
+        atRisk: allProjects.filter(p => p.status === "At Risk").length,
+        blocked: allProjects.filter(p => p.status === "Blocked").length,
+        completed: allProjects.filter(p => p.status === "Completed").length,
       },
       tasksByStatus: {
-        todo: allTasks.filter((t) => t.status === "To Do").length,
-        inProgress: allTasks.filter((t) => t.status === "In Progress").length,
-        waitingForClient: allTasks.filter((t) => t.status === "Waiting for Client").length,
-        done: allTasks.filter((t) => t.status === "Done").length,
-        blocked: allTasks.filter((t) => t.status === "Blocked").length,
+        todo: allTasks.filter(t => t.status === "To Do").length,
+        inProgress: allTasks.filter(t => t.status === "In Progress").length,
+        waitingForClient: allTasks.filter(t => t.status === "Waiting for Client").length,
+        done: allTasks.filter(t => t.status === "Done").length,
+        blocked: allTasks.filter(t => t.status === "Blocked").length,
       },
-      atRiskProjects: allProjects
-        .filter((p) => p.status === "At Risk")
-        .map(p => ({ id: p.id, name: p.name, client: p.clientName, deadline: p.deadline, manager: p.projectManager })),
-      blockedProjects: allProjects
-        .filter((p) => p.status === "Blocked")
-        .map(p => ({ id: p.id, name: p.name, client: p.clientName, deadline: p.deadline })),
-      // Dashboard "projects at risk" metric = At Risk + Blocked combined
-      projectsNeedingAttention: allProjects
-        .filter((p) => p.status === "At Risk" || p.status === "Blocked")
-        .map(p => ({ id: p.id, name: p.name, client: p.clientName, status: p.status, deadline: p.deadline, manager: p.projectManager })),
-      criticalBlockedTasks: allTasks
-        .filter((t) => t.isBlocked && t.priority === "Critical")
-        .map(t => ({ id: t.id, title: t.title, projectId: t.projectId, blocker: t.blockerDescription })),
+      // Dashboard "projects at risk" = At Risk + Blocked combined
+      projectsNeedingAttention: atRiskProjects.map(p => ({ id: p.id, name: p.name, client: p.clientName, status: p.status, deadline: p.deadline, manager: p.projectManager })),
+      criticalBlockedTasks: allTasks.filter(t => t.isBlocked && t.priority === "Critical").map(t => ({ id: t.id, title: t.title, projectId: t.projectId, blocker: t.blockerDescription })),
     },
   };
 
-  if (!ai) {
-    const reply =
-      responseLanguage === "he"
-        ? `מצטער, מצב AI לא זמין כרגע (מצב fallback). נמצאו ${contextData.summary.totalProjects} פרויקטים ו-${contextData.summary.totalTasks} משימות במערכת. ${contextData.summary.blockedTasks > 0 ? `ישנן ${contextData.summary.blockedTasks} משימות חסומות הדורשות טיפול.` : "אין משימות חסומות כרגע."}`
-        : `AI mode is unavailable (fallback). The system has ${contextData.summary.totalProjects} projects and ${contextData.summary.totalTasks} tasks. ${contextData.summary.blockedTasks > 0 ? `There are ${contextData.summary.blockedTasks} blocked tasks requiring attention.` : "No blocked tasks at this time."}`;
-    return res.json({ reply, source: "local-fallback" });
-  }
+  return { contextData, projectContext, allProjects, allTasks };
+}
 
-  const systemPrompt = `You are an expert AI assistant embedded in SyncPro, a professional project management command center.
-You have access to real-time data about all projects and tasks in the system.
+function buildSystemPrompt(contextData: object, projectContext: string, responseLanguage: ResponseLanguage) {
+  return `You are an expert AI assistant embedded in SyncPro, a professional project management platform.
+You have real-time access to all project and task data.${projectContext}
 
-CURRENT SYSTEM DATA:
+SYSTEM DATA:
 ${JSON.stringify(contextData, null, 2)}
 
 INSTRUCTIONS:
-- Answer the project manager's question based ONLY on the data provided above
-- Be concise, actionable, and professional
-- Highlight blockers and critical items when relevant
-- Format your response clearly with bullet points or numbered lists when listing multiple items
-- Respond in ${responseLanguage === "he" ? "Hebrew (עברית)" : "English"}
-- Do not make up information not present in the data
-- If a question cannot be answered from the data, say so clearly
-- For status questions, always mention specific project/task names
-- Keep responses under 300 words unless more detail is genuinely needed
-- CRITICAL: DO NOT use markdown bolding (double asterisks, i.e., "**") in your response under any circumstances. Instead of "**bold text**", use normal text, uppercase names, clean spacing, bullet points, or list separators to emphasize. Do not output "**" at all.
-- IMPORTANT STATUS RULE: When the user asks about "at risk" projects, use the "projectsNeedingAttention" list which includes BOTH status="At Risk" AND status="Blocked" projects. The dashboard's "projects at risk" counter = atRisk + blocked combined. Never say there are zero at-risk projects if projectsNeedingAttention is non-empty.`;
+- Answer based ONLY on the data above. Do not invent facts.
+- Be concise, direct, and actionable.
+- Use bullet points or numbered lists for multiple items.
+- Mention specific project/task names in status answers.
+- Respond in ${responseLanguage === "he" ? "Hebrew (עברית)" : "English"}.
+- Keep responses under 400 words unless the question genuinely requires more.
+- You may use **bold** to emphasize critical items.
+- IMPORTANT: When asked about "at risk" projects, use "projectsNeedingAttention" which combines both At Risk AND Blocked statuses — this matches the dashboard "projects at risk" counter. Never say zero if that list is non-empty.`;
+}
+
+function buildContents(history: ChatHistoryTurn[], message: string) {
+  return [
+    ...history.slice(-20).map(turn => ({
+      role: (turn.role === "assistant" ? "model" : "user") as "model" | "user",
+      parts: [{ text: turn.content }],
+    })),
+    { role: "user" as const, parts: [{ text: message }] },
+  ];
+}
+
+// AI Chat endpoint — multi-turn, project-aware
+app.post("/api/ai/chat", async (req, res) => {
+  const { message, history = [], language = "en", projectId } = req.body as {
+    message?: string;
+    history?: ChatHistoryTurn[];
+    language?: ResponseLanguage;
+    projectId?: string;
+  };
+  if (!message?.trim()) return res.status(400).json({ error: "Message is required." });
+
+  const responseLanguage: ResponseLanguage = language === "he" ? "he" : "en";
 
   try {
+    const { contextData, projectContext, allProjects, allTasks } = await buildAiContext(projectId);
+
+    if (!ai) {
+      const atRisk = contextData.summary.projectsNeedingAttention.length;
+      const reply = responseLanguage === "he"
+        ? `AI אינו זמין כעת. סיכום: ${allProjects.length} פרויקטים, ${atRisk} בסיכון, ${allTasks.filter(t => t.isBlocked).length} משימות חסומות.`
+        : `AI unavailable. Summary: ${allProjects.length} projects, ${atRisk} needing attention, ${allTasks.filter(t => t.isBlocked).length} blocked tasks.`;
+      return res.json({ reply, source: "local-fallback" });
+    }
+
+    const systemPrompt = buildSystemPrompt(contextData, projectContext, responseLanguage);
+    const contents = buildContents(Array.isArray(history) ? history : [], message);
+
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
-      contents: `${systemPrompt}\n\nProject Manager Question: ${message}`,
+      config: { systemInstruction: systemPrompt },
+      contents,
     });
 
     const reply = readText(response.text);
     res.json({ reply: reply || "No response generated.", source: reply ? "gemini" : "local-fallback" });
   } catch (error) {
-    console.error("AI chat fallback:", error);
-    const fallbackReply =
-      responseLanguage === "he"
-        ? `שגיאה בגישה ל-AI. מידע ממערכת: ${contextData.summary.totalProjects} פרויקטים פעילים, ${contextData.summary.blockedTasks} חסומים.`
-        : `AI error occurred. System data: ${contextData.summary.totalProjects} active projects, ${contextData.summary.blockedTasks} blocked tasks.`;
-    res.json({ reply: fallbackReply, source: "local-fallback" });
+    console.error("AI chat error:", error);
+    res.status(500).json({ error: "AI request failed.", source: "local-fallback" });
+  }
+});
+
+// AI Chat streaming endpoint — SSE, multi-turn, project-aware
+app.post("/api/ai/chat/stream", async (req, res) => {
+  const { message, history = [], language = "en", projectId } = req.body as {
+    message?: string;
+    history?: ChatHistoryTurn[];
+    language?: ResponseLanguage;
+    projectId?: string;
+  };
+
+  if (!message?.trim()) {
+    res.status(400).json({ error: "Message is required." });
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const responseLanguage: ResponseLanguage = language === "he" ? "he" : "en";
+
+  if (!ai) {
+    const fallback = responseLanguage === "he" ? "AI אינו זמין כעת." : "AI is currently unavailable.";
+    res.write(`data: ${JSON.stringify({ text: fallback })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
+    return;
+  }
+
+  try {
+    const { contextData, projectContext } = await buildAiContext(projectId);
+    const systemPrompt = buildSystemPrompt(contextData, projectContext, responseLanguage);
+    const contents = buildContents(Array.isArray(history) ? history : [], message);
+
+    const stream = await ai.models.generateContentStream({
+      model: GEMINI_MODEL,
+      config: { systemInstruction: systemPrompt },
+      contents,
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.text) {
+        res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+      }
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
+  } catch (error) {
+    console.error("AI stream error:", error);
+    const errText = responseLanguage === "he" ? "שגיאה ב-AI. נסה שוב." : "AI error. Please try again.";
+    res.write(`data: ${JSON.stringify({ text: errText })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
+  }
+});
+
+// Daily PM brief — short AI-generated morning summary
+app.get("/api/ai/daily-brief", async (req, res) => {
+  const language: ResponseLanguage = (req.query.language as ResponseLanguage) === "he" ? "he" : "en";
+  const [allProjects, allTasks] = await Promise.all([getProjects(), getTasks()]);
+
+  const atRisk = allProjects.filter(p => p.status === "At Risk" || p.status === "Blocked");
+  const blockedTasks = allTasks.filter(t => t.isBlocked);
+  const criticalOpen = allTasks.filter(t => t.priority === "Critical" && t.status !== "Done");
+  const upcoming = allProjects.filter(p => {
+    if (!p.deadline) return false;
+    const days = Math.ceil((new Date(p.deadline).getTime() - Date.now()) / 86400000);
+    return days >= 0 && days <= 7;
+  });
+
+  function localBrief() {
+    if (language === "he") {
+      const parts: string[] = [];
+      if (atRisk.length) parts.push(`${atRisk.length} פרויקטים דורשים תשומת לב מיידית.`);
+      if (blockedTasks.length) parts.push(`${blockedTasks.length} משימות חסומות ממתינות לפתרון.`);
+      if (criticalOpen.length) parts.push(`${criticalOpen.length} משימות קריטיות פתוחות.`);
+      if (upcoming.length) parts.push(`${upcoming.length} פרויקטים עם דדליין השבוע.`);
+      return parts.length ? parts.join(" ") : "הפורטפוליו יציב. אין חסמים פעילים.";
+    } else {
+      const parts: string[] = [];
+      if (atRisk.length) parts.push(`${atRisk.length} projects need immediate attention.`);
+      if (blockedTasks.length) parts.push(`${blockedTasks.length} blocked tasks awaiting resolution.`);
+      if (criticalOpen.length) parts.push(`${criticalOpen.length} critical tasks open.`);
+      if (upcoming.length) parts.push(`${upcoming.length} projects with deadlines this week.`);
+      return parts.length ? parts.join(" ") : "Portfolio is stable. No active blockers.";
+    }
+  }
+
+  if (!ai) return res.json({ brief: localBrief(), source: "local-fallback" });
+
+  const prompt = `You are writing a morning briefing for a project manager.
+
+DATA:
+- Total projects: ${allProjects.length}
+- Projects needing attention (At Risk or Blocked): ${atRisk.map(p => `${p.name} [${p.status}]`).join(", ") || "none"}
+- Blocked tasks: ${blockedTasks.length > 0 ? blockedTasks.slice(0, 5).map(t => t.title).join(", ") : "none"}
+- Critical open tasks: ${criticalOpen.length}
+- Projects with deadlines this week: ${upcoming.map(p => p.name).join(", ") || "none"}
+
+Write a concise, sharp morning brief in 2-3 sentences:
+1. State the most urgent situation
+2. Name the top 1-2 priorities for today
+3. End constructively
+
+Language: ${language === "he" ? "Hebrew (עברית)" : "English"}
+Style: Professional, direct. No filler words.`;
+
+  try {
+    const response = await ai.models.generateContent({ model: GEMINI_MODEL, contents: prompt });
+    const brief = readText(response.text);
+    res.json({ brief: brief || localBrief(), source: brief ? "gemini" : "local-fallback" });
+  } catch (err) {
+    console.error("Daily brief error:", err);
+    res.json({ brief: localBrief(), source: "local-fallback" });
   }
 });
 

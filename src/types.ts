@@ -97,6 +97,11 @@ export interface CustomerUpdateResponse {
   source?: 'gemini' | 'local-fallback';
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface SystemStatus {
   aiMode: 'gemini' | 'local-fallback';
   geminiModel: string;

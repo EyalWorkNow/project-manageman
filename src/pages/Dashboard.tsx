@@ -120,69 +120,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] pb-20">
-      {/* Header */}
-      <header className={cn(
-        'sticky top-0 md:top-0 z-20 px-6 md:px-8 py-4 bg-white/80 backdrop-blur-md border-b border-zinc-200/50 flex flex-col md:flex-row md:items-center justify-between gap-3',
-        isRTL && 'text-right'
-      )}>
-        <div className={cn('flex flex-col md:flex-row md:items-center gap-4', isRTL && 'md:flex-row-reverse')}>
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-900 tracking-tight">{t('dash.title')}</h1>
-            <p className="text-xs text-zinc-500 font-medium mt-0.5">
-              {isRTL ? `${projects.length} פרויקטים • ${tasks.length} משימות` : `${projects.length} projects • ${tasks.length} tasks`}
-            </p>
-          </div>
-
-          <div className="relative">
-            <SearchNormal1 variant="Linear" color="currentColor" className={cn('absolute top-1/2 -translate-y-1/2 text-zinc-400', isRTL ? 'right-3' : 'left-3')} size={14} />
-            <input
-              type="text"
-              placeholder={t('dash.search') || 'SearchNormal1 projects...'}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className={cn(
-                'h-9 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-800 focus:outline-none focus:bg-white focus:border-zinc-300 focus:ring-4 focus:ring-zinc-100 w-64 transition-all placeholder:text-zinc-400',
-                isRTL ? 'pr-9 pl-4 text-right' : 'pl-9 pr-4'
-              )}
-            />
-          </div>
-        </div>
-
-        <div className={cn('flex items-center gap-3', isRTL && 'flex-row-reverse')}>
-          <div className={cn('hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-50 border border-zinc-200/60 rounded-xl')}>
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
-              {isRTL ? 'מערכת פעילה' : 'Live'}
-            </span>
-          </div>
-          <Link
-            to="/ai-chat"
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 bg-zinc-50 border border-zinc-200 text-zinc-700 rounded-xl font-semibold text-xs hover:bg-zinc-100 hover:text-zinc-900 transition-all cursor-pointer',
-              isRTL && 'flex-row-reverse'
-            )}
-          >
-            <Messages2 variant="Linear" color="currentColor" size={14} />
-            {isRTL ? 'צ׳אט AI' : 'AI Chat'}
-          </Link>
-          <Link
-            to="/projects/new"
-            className={cn(
-              'flex items-center gap-2 px-5 py-2 bg-zinc-900 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-zinc-800 transition-all active:scale-95 cursor-pointer',
-              isRTL && 'flex-row-reverse'
-            )}
-          >
-            <AddCircle variant="Linear" color="currentColor" size={14} />
-            {t('dash.new_project')}
-          </Link>
-        </div>
-      </header>
-
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="p-6 md:p-8 space-y-8"
+        className="p-6 md:p-8 pt-8 md:pt-10 space-y-8"
       >
         {/* Hero banner */}
         <motion.div
@@ -195,7 +137,7 @@ export default function Dashboard() {
               <div className={cn('flex items-center gap-2 mb-3', isRTL && 'flex-row-reverse')}>
                 <div className="w-2 h-2 rounded-full bg-zinc-900" />
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
-                  {isRTL ? 'מרכז שליטה' : 'Command Center'}
+                  {isRTL ? 'מרכז שליטה • Dashboard' : 'Command Center • Dashboard'}
                 </p>
               </div>
               <h2 className="text-3xl md:text-4xl font-medium text-zinc-900 mb-4 tracking-tight">

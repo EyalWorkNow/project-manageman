@@ -2,6 +2,7 @@ import {
   Project,
   Task,
   AISummary,
+  ChatMessage,
   CustomerUpdateResponse,
   SystemStatus,
   Comment,
@@ -80,7 +81,9 @@ export const api = {
       fetch('/api/ai/customer-update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project, tasks, language }) }).then(r => handleResponse<CustomerUpdateResponse>(r)),
     draft: (message: string, context?: string, language: 'en' | 'he' = 'en'): Promise<{ reply: string; source: string }> =>
       fetch('/api/ai/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, context, language }) }).then(r => handleResponse<{ reply: string; source: string }>(r)),
-    chat: (message: string, language: 'en' | 'he' = 'en'): Promise<{ reply: string; source: string }> =>
-      fetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, language }) }).then(r => handleResponse<{ reply: string; source: string }>(r)),
+    chat: (message: string, history: ChatMessage[] = [], language: 'en' | 'he' = 'en', projectId?: string): Promise<{ reply: string; source: string }> =>
+      fetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history, language, projectId }) }).then(r => handleResponse<{ reply: string; source: string }>(r)),
+    dailyBrief: (language: 'en' | 'he' = 'en'): Promise<{ brief: string; source: string }> =>
+      fetch(`/api/ai/daily-brief?language=${language}`).then(r => handleResponse<{ brief: string; source: string }>(r)),
   },
 };
