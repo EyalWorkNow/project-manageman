@@ -2,14 +2,18 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/server.cjs",
-      "use": "@vercel/node"
+      "src": "server.ts",
+      "use": "@vercel/node",
+      "config": {
+        "buildCommand": "vite build",
+        "includeFiles": ["dist/**", "public/**"]
+      }
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "dist/server.cjs"
+      "dest": "/server.ts"
     }
   ]
 }

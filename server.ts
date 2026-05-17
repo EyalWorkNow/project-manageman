@@ -2090,7 +2090,13 @@ async function startServer() {
   });
 }
 
-startServer().catch((error) => {
-  console.error("Failed to start server:", error);
-  process.exit(1);
-});
+// On Vercel (serverless) we export the app — listen() is not called.
+// Locally, startServer() boots Vite middleware and binds the port.
+if (!process.env.VERCEL) {
+  startServer().catch((error) => {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  });
+}
+
+export default app;
