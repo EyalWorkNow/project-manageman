@@ -32,8 +32,10 @@ function timeAgo(dateString: string, isRTL: boolean) {
   return isRTL ? `לפני ${days} ימים` : `${days}d ago`;
 }
 
+const TASK_COLOR_PRESETS = ['#0073EA', '#00C875', '#FDAB3D', '#E2445C', '#A25DDC', '#1F2D3D', '#579BFC', '#9CA3AF'];
+
 export default function TaskDetailModal({ task, onClose, onUpdate, onDelete, currentUser = 'You' }: Props) {
-  const { t, isRTL, language } = useI18n();
+  const { t, isRTL } = useI18n();
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Task>>({});
   const [comments, setComments] = useState<Comment[]>([]);
@@ -51,6 +53,9 @@ export default function TaskDetailModal({ task, onClose, onUpdate, onDelete, cur
       priority: task.priority, dueDate: task.dueDate,
       isBlocked: task.isBlocked, blockerDescription: task.blockerDescription,
       internalNotes: task.internalNotes,
+      startDate: task.startDate,
+      progressPercent: task.progressPercent ?? 0,
+      displayColor: task.displayColor || '',
     });
     setEditing(false);
     setConfirmDelete(false);
@@ -101,6 +106,9 @@ export default function TaskDetailModal({ task, onClose, onUpdate, onDelete, cur
   }
 
   if (!task) return null;
+
+  const currentTaskColor = editData.displayColor || task.displayColor || '';
+  const currentProgress = typeof editData.progressPercent === 'number' ? editData.progressPercent : (task.progressPercent ?? 0);
 
   return (
     <AnimatePresence>
@@ -216,6 +224,40 @@ export default function TaskDetailModal({ task, onClose, onUpdate, onDelete, cur
                   )}
                 </div>
 
+                {/* Start date */}
+                <div className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F6F7FB] border border-[#E6E9EF]', isRTL && 'flex-row-reverse')}>
+                  <Calendar1 size={13} color="#6B7A8D" />
+                  {editing ? (
+                    <input
+                      type="date"
+                      value={editData.startDate || ''}
+                      onChange={e => setEditData(d => ({ ...d, startDate: e.target.value }))}
+                      className="text-xs font-medium text-[#1F2D3D] bg-transparent outline-none"
+                    />
+                  ) : (
+                    <span className="text-xs font-medium text-[#1F2D3D]">
+                      {task.startDate ? formatDate(task.startDate) : (isRTL ? 'ללא התחלה' : 'No start')}
+                    </span>
+                  )}
+                </div>
+
+                {/* Progress */}
+                <div className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F6F7FB] border border-[#E6E9EF]', isRTL && 'flex-row-reverse')}>
+                  <span className="text-[11px] font-bold text-[#6B7A8D]">%</span>
+                  {editing ? (
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={currentProgress}
+                      onChange={e => setEditData(d => ({ ...d, progressPercent: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }))}
+                      className="w-16 text-xs font-medium text-[#1F2D3D] bg-transparent outline-none"
+                    />
+                  ) : (
+                    <span className="text-xs font-medium text-[#1F2D3D]">{Math.round(task.progressPercent ?? 0)}%</span>
+                  )}
+                </div>
+
                 {/* Priority (editing) */}
                 {editing && (
                   <div className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F6F7FB] border border-[#E6E9EF]', isRTL && 'flex-row-reverse')}>
@@ -244,6 +286,77 @@ export default function TaskDetailModal({ task, onClose, onUpdate, onDelete, cur
                   </div>
                 )}
               </div>
+
+              {(editing || currentTaskColor) && (
+                <div>
+                  <p className={cn('text-[10px] font-bold uppercase tracking-widest text-[#6B7A8D] mb-2', isRTL && 'text-right')}>
+                    {isRTL ? 'צבע בגאנט' : 'Gantt Color'}
+                  </p>
+                  <div className={cn('flex flex-wrap items-center gap-2', isRTL && 'flex-row-reverse')}>
+                    {TASK_COLOR_PRESETS.map((color) => {
+                      const active = currentTaskColor === color;
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => editing && setEditData(d => ({ ...d, displayColor: color }))}
+                          disabled={!editing}
+                          className={cn(
+                            'h-7 w-7 rounded-full border-2 transition-all',
+                            active ? 'border-[#1F2D3D] scale-105' : 'border-white',
+                            !editing && 'cursor-default opacity-90',
+                          )}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      );
+                    })}
+                    {editing && (
+                      <label className={cn('inline-flex items-center gap-2 rounded-xl border border-[#E6E9EF] bg-[#F6F7FB] px-3 py-1.5 text-xs font-medium text-[#1F2D3D]', isRTL && 'flex-row-reverse')}>
+                        <input
+                          type="color"
+                          value={currentTaskColor || '#0073EA'}
+                          onChange={e => setEditData(d => ({ ...d, displayColor: e.target.value.toUpperCase() }))}
+                          className="h-5 w-5 cursor-pointer border-0 bg-transparent p-0"
+                        />
+                        {isRTL ? 'בחירה חופשית' : 'Custom'}
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {editing && (
+                <div className="rounded-xl border border-[#E6E9EF] bg-[#F6F7FB] px-4 py-3">
+                  <div className={cn('flex items-center justify-between gap-3', isRTL && 'flex-row-reverse')}>
+                    <div>
+                      <p className="text-xs font-bold text-[#1F2D3D]">{isRTL ? 'משימה חסומה' : 'Task blocked'}</p>
+                      <p className="text-[11px] text-[#6B7A8D]">
+                        {isRTL ? 'סמן משימה שחייבת טיפול כדי להתקדם' : 'Mark tasks that cannot move without intervention'}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editData.isBlocked)}
+                      onChange={e => setEditData(d => ({
+                        ...d,
+                        isBlocked: e.target.checked,
+                        status: e.target.checked ? 'Blocked' : (d.status === 'Blocked' ? 'To Do' : d.status),
+                      }))}
+                      className="h-4 w-4 accent-[#E2445C]"
+                    />
+                  </div>
+                  {editData.isBlocked && (
+                    <textarea
+                      value={editData.blockerDescription || ''}
+                      onChange={e => setEditData(d => ({ ...d, blockerDescription: e.target.value }))}
+                      rows={2}
+                      className={cn('mt-3 w-full rounded-xl border border-[#F5C0CA] bg-white px-3 py-2 text-xs text-[#1F2D3D] outline-none focus:border-[#E2445C] resize-none', isRTL && 'text-right')}
+                      placeholder={isRTL ? 'מה חוסם את המשימה כרגע?' : 'What is blocking this task right now?'}
+                    />
+                  )}
+                </div>
+              )}
 
               {/* Description */}
               <div>

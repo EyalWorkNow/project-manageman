@@ -157,10 +157,9 @@ function mapUiPriority(priority: TaskPriority) {
 }
 
 function taskProgressForStatus(status: TaskStatus, existing?: number) {
+  if (status === "Done") return 100;
   if (typeof existing === "number" && existing >= 0 && existing <= 100) return existing;
   switch (status) {
-    case "Done":
-      return 100;
     case "Waiting for Client":
       return 75;
     case "In Progress":
@@ -310,6 +309,7 @@ function mapTaskRow(row: Record<string, any>): Task {
     taskType: row.task_type || "task",
     baselineStartDate: row.baseline_start_date ? toIsoDate(row.baseline_start_date) : undefined,
     baselineEndDate: row.baseline_end_date ? toIsoDate(row.baseline_end_date) : undefined,
+    displayColor: readHexColor(metadata.displayColor),
   };
 }
 
@@ -455,6 +455,7 @@ async function getProjectGantt(projectId: string): Promise<ProjectGanttData | nu
       `
         SELECT
           v.*,
+          gt.metadata,
           COALESCE(assignees.assignees, ARRAY[]::TEXT[]) AS assignees,
           baseline.baseline_name,
           baseline.baseline_version,
@@ -462,6 +463,7 @@ async function getProjectGantt(projectId: string): Promise<ProjectGanttData | nu
           baseline.baseline_end_date,
           COALESCE(comment_counts.comments_count, 0) AS comments_count
         FROM v_gantt_tasks v
+        LEFT JOIN gantt_tasks gt ON gt.id = v.task_id
         LEFT JOIN LATERAL (
           SELECT ARRAY_AGG(u.full_name ORDER BY u.full_name) AS assignees
           FROM gantt_task_assignments a
@@ -604,6 +606,7 @@ async function getProjectGantt(projectId: string): Promise<ProjectGanttData | nu
       baselineStartDate: row.baseline_start_date ? toIsoDate(row.baseline_start_date) : null,
       baselineEndDate: row.baseline_end_date ? toIsoDate(row.baseline_end_date) : null,
       commentsCount: Number(row.comments_count ?? 0),
+      displayColor: readHexColor(row.metadata?.displayColor),
     })) satisfies GanttTimelineTask[],
     milestones: milestoneResult.rows.map((row) => ({
       id: row.id,
@@ -663,6 +666,21 @@ function readDate(value: unknown) {
   return date;
 }
 
+function readNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function readHexColor(value: unknown) {
+  const color = readText(value);
+  if (!color) return "";
+  return /^#([0-9A-F]{6}|[0-9A-F]{3})$/i.test(color) ? color.toUpperCase() : "";
+}
+
 function validateProjectInput(input: Partial<Project>, existing?: Project): ValidationResult<Project> {
   const source = { ...existing, ...input };
   const details: Record<string, string> = {};
@@ -710,13 +728,23 @@ function validateTaskInput(input: Partial<Task>, existing?: Task): ValidationRes
   const title = readText(source.title);
   const description = typeof source.description === 'string' ? source.description : "No description provided";
   const assignee = typeof source.assignee === 'string' ? source.assignee : "Unassigned";
+  const startDate = source.startDate ? readDate(source.startDate) : "";
   const dueDate = readDate(source.dueDate);
+  const progressPercentInput = source.progressPercent === undefined ? null : readNumber(source.progressPercent);
+  const displayColor = source.displayColor ? readHexColor(source.displayColor) : "";
   const status = source.status;
   const priority = source.priority;
 
   if (!projectId) details.projectId = "Parent project is required.";
   if (!title) details.title = "Task title is required.";
+  if (source.startDate && !startDate) details.startDate = "A valid task start date is required.";
   if (!dueDate) details.dueDate = "A valid task due date is required.";
+  if (progressPercentInput !== null && (progressPercentInput < 0 || progressPercentInput > 100)) {
+    details.progressPercent = "Progress must be between 0 and 100.";
+  }
+  if (source.displayColor && !displayColor) {
+    details.displayColor = "Display color must be a valid hex color.";
+  }
   if (!isOneOf(TASK_STATUSES, status)) {
     details.status = `Status must be one of: ${TASK_STATUSES.join(", ")}.`;
   }
@@ -751,6 +779,9 @@ function validateTaskInput(input: Partial<Task>, existing?: Task): ValidationRes
       internalNotes: readText(source.internalNotes),
       createdAt: existing?.createdAt || timestamp,
       updatedAt: timestamp,
+      startDate: startDate || dueDate,
+      progressPercent: progressPercentInput === null ? existing?.progressPercent : progressPercentInput,
+      displayColor,
     },
   };
 }
@@ -1085,6 +1116,7 @@ app.post("/api/tasks", async (req, res) => {
       internalNotes: validation.value.internalNotes,
       blockerDescription: validation.value.blockerDescription,
       rawAssignee: validation.value.assignee,
+      displayColor: validation.value.displayColor || null,
       source: "pm_app",
     };
 
@@ -1169,8 +1201,11 @@ app.post("/api/tasks", async (req, res) => {
         existing ? "task_updated" : "task_created",
         JSON.stringify({
           status: mapUiTaskStatus(validation.value.status),
+          startDate,
           dueDate: validation.value.dueDate,
+          progressPercent,
           assignee: validation.value.assignee,
+          displayColor: validation.value.displayColor || null,
         }),
         existing ? "Task updated from PM workspace." : "Task created from PM workspace.",
       ],

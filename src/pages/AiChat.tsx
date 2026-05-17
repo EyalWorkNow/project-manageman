@@ -188,7 +188,7 @@ export default function AiChat() {
         <div className="px-6 py-6 border-b border-zinc-800/60 shrink-0">
           <div className={cn('flex items-center gap-3 mb-2', isRTL && 'flex-row-reverse')}>
             <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/10 shadow-inner">
-              <Cpu variant="Bold" className="text-white" size={20} />
+              <Cpu variant="Linear" color="currentColor" className="text-white" size={20} />
             </div>
             <div className={isRTL ? 'text-right' : 'text-left'}>
               <h2 className="text-sm font-bold text-white tracking-tight">
@@ -213,19 +213,19 @@ export default function AiChat() {
           </p>
           <div className="space-y-2">
             <ContextItem
-              icon={<Folder2 variant="Bold" className="text-[#0080EC]" size={14} />}
+              icon={<Folder2 variant="Linear" color="currentColor" className="text-[#0080EC]" size={14} />}
               label={isRTL ? 'פרויקטים' : 'Projects'}
               value={systemStats ? `${systemStats.projects}` : '...'}
               color="blue"
             />
             <ContextItem
-              icon={<ClipboardText variant="Bold" className="text-purple-400" size={14} />}
+              icon={<ClipboardText variant="Linear" color="currentColor" className="text-purple-400" size={14} />}
               label={isRTL ? 'משימות במערכת' : 'Total Tasks'}
               value={systemStats ? `${systemStats.tasks}` : '...'}
               color="purple"
             />
             <ContextItem
-              icon={<Warning2 variant="Bold" className="text-red-400" size={14} />}
+              icon={<Warning2 variant="Linear" color="currentColor" className="text-red-400" size={14} />}
               label={isRTL ? 'משימות חסומות' : 'Blocked Items'}
               value={systemStats ? `${systemStats.blocked}` : '...'}
               color="red"
@@ -265,7 +265,7 @@ export default function AiChat() {
         {/* Sidebar Footer */}
         <div className="px-6 py-5 border-t border-zinc-800/60 bg-zinc-950/80 shrink-0">
           <div className={cn('flex items-center gap-2 text-[10px] text-zinc-500', isRTL && 'flex-row-reverse')}>
-            <Flash variant="Bold" className="text-[#0080EC]" size={12} />
+            <Flash variant="Linear" color="currentColor" className="text-[#0080EC]" size={12} />
             <span>{isRTL ? 'מונע באמצעות מנוע Gemini AI' : 'Powered by active Gemini AI'}</span>
           </div>
         </div>
@@ -288,7 +288,7 @@ export default function AiChat() {
             
             {/* AI Assistant logo & titles */}
             <div className="w-10 h-10 rounded-2xl bg-zinc-950 flex items-center justify-center shadow-sm">
-              <Messages2 variant="Bold" className="text-white" size={18} />
+              <Messages2 variant="Linear" color="currentColor" className="text-white" size={18} />
             </div>
             <div className={isRTL ? 'text-right' : 'text-left'}>
               <h1 className="text-base font-bold text-zinc-950 tracking-tight">
@@ -305,7 +305,7 @@ export default function AiChat() {
               onClick={clearChat}
               className={cn("flex items-center gap-1.5 text-xs font-bold text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 px-3 py-2 rounded-xl transition-all duration-300 cursor-pointer", isRTL && "flex-row-reverse")}
             >
-              <Trash variant="Bold" size={13} />
+              <Trash variant="Linear" color="currentColor" size={13} />
               {isRTL ? 'נקה שיחה' : 'Reset Conversation'}
             </button>
           )}
@@ -335,8 +335,8 @@ export default function AiChat() {
                         : 'bg-white border border-zinc-100'
                     )}>
                       {msg.role === 'user'
-                        ? <User variant="Bold" className="text-white" size={16} />
-                        : <Cpu variant="Bold" className="text-[#0080EC]" size={16} />
+                        ? <User variant="Linear" color="currentColor" className="text-white" size={16} />
+                        : <Cpu variant="Linear" color="currentColor" className="text-[#0080EC]" size={16} />
                       }
                     </div>
 
@@ -380,7 +380,7 @@ export default function AiChat() {
                   className="flex gap-4.5"
                 >
                   <div className="w-10 h-10 rounded-2xl bg-white border border-zinc-100 flex items-center justify-center shadow-sm">
-                    <Cpu variant="Bold" className="text-[#0080EC]" size={16} />
+                    <Cpu variant="Linear" color="currentColor" className="text-[#0080EC]" size={16} />
                   </div>
                   <div className="bg-white border border-zinc-100 px-5 py-4 rounded-3xl rounded-tl-sm flex items-center gap-1.5 shadow-sm">
                     <span className="w-2.5 h-2.5 rounded-full bg-zinc-300 animate-bounce [animation-delay:-0.3s]" />
@@ -490,7 +490,7 @@ function EmptyState({ isRTL, onSuggestion, suggestions }: EmptyStateProps) {
         <div className="relative w-16 h-16 mx-auto mb-6 flex items-center justify-center">
           <div className="absolute inset-0 rounded-2xl bg-zinc-950 animate-ping opacity-15" />
           <div className="relative w-16 h-16 rounded-2xl bg-zinc-950 flex items-center justify-center shadow-lg">
-            <Magicpen variant="Bold" className="text-white animate-pulse" size={26} />
+            <Magicpen variant="Linear" color="currentColor" className="text-white animate-pulse" size={26} />
           </div>
         </div>
         <h2 className="text-2xl font-bold text-zinc-950 tracking-tight mb-3">
@@ -530,7 +530,7 @@ function EmptyState({ isRTL, onSuggestion, suggestions }: EmptyStateProps) {
 
       {/* Safe context info */}
       <div className="mt-8 flex items-center gap-2 justify-center text-[10px] font-bold text-zinc-400">
-        <InfoCircle variant="Bold" size={13} />
+        <InfoCircle variant="Linear" color="currentColor" size={13} />
         {isRTL
           ? 'האינטגרציה עובדת בצורה מאובטחת תחת תקני LinnoProjact'
           : 'Highly secure server-to-server transaction. Data is kept private.'}

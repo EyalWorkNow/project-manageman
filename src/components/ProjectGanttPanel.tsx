@@ -24,6 +24,7 @@ interface Props {
   members: ProjectMember[];
   loading: boolean;
   isRTL: boolean;
+  onTaskOpen?: (taskId: string) => void;
 }
 
 const DAY_WIDTH = 34;
@@ -92,7 +93,23 @@ function timelineBarClass(status: string) {
   }
 }
 
-export default function ProjectGanttPanel({ data, members, loading, isRTL }: Props) {
+function timelineBarColor(status: string, displayColor?: string | null) {
+  if (displayColor) return displayColor;
+  switch (status) {
+    case 'done':
+      return '#00C875';
+    case 'blocked':
+      return '#E2445C';
+    case 'in_review':
+      return '#FDAB3D';
+    case 'in_progress':
+      return '#0073EA';
+    default:
+      return '#9CA3AF';
+  }
+}
+
+export default function ProjectGanttPanel({ data, members, loading, isRTL, onTaskOpen }: Props) {
   if (loading) {
     return (
       <div className="space-y-4 p-6">
@@ -241,7 +258,11 @@ export default function ProjectGanttPanel({ data, members, loading, isRTL }: Pro
 
               return (
                 <div key={task.taskId} className="flex border-t border-zinc-100">
-                  <div className="sticky left-0 z-10 flex w-[280px] items-center gap-3 border-r border-zinc-200/70 bg-white px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => onTaskOpen?.(task.taskId)}
+                    className="sticky left-0 z-10 flex w-[280px] items-center gap-3 border-r border-zinc-200/70 bg-white px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+                  >
                     <div className={cn('h-2.5 w-2.5 rounded-full', task.isCriticalPath ? 'bg-red-500' : 'bg-zinc-300')} />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-zinc-900">{task.title}</p>
@@ -250,7 +271,7 @@ export default function ProjectGanttPanel({ data, members, loading, isRTL }: Pro
                         {task.assignees.length > 0 ? ` · ${task.assignees.join(', ')}` : ''}
                       </p>
                     </div>
-                  </div>
+                  </button>
 
                   <div
                     className="relative"
@@ -269,12 +290,21 @@ export default function ProjectGanttPanel({ data, members, loading, isRTL }: Pro
                       />
                     )}
 
-                    <div
-                      className={cn('absolute top-5 h-5 overflow-hidden rounded-full shadow-sm', timelineBarClass(task.taskStatus))}
-                      style={{ left: startOffset * DAY_WIDTH + 2, width: Math.max(width - 4, 12) }}
+                    <button
+                      type="button"
+                      onClick={() => onTaskOpen?.(task.taskId)}
+                      className={cn(
+                        'absolute top-5 h-5 overflow-hidden rounded-full shadow-sm transition-all hover:ring-2 hover:ring-black/10',
+                        timelineBarClass(task.taskStatus),
+                      )}
+                      style={{
+                        left: startOffset * DAY_WIDTH + 2,
+                        width: Math.max(width - 4, 12),
+                        backgroundColor: timelineBarColor(task.taskStatus, task.displayColor),
+                      }}
                     >
                       <div className="h-full bg-black/15" style={{ width: `${Math.max(0, Math.min(task.progressPercent, 100))}%` }} />
-                    </div>
+                    </button>
 
                     <div
                       className="absolute top-10 text-[10px] font-medium text-zinc-500"

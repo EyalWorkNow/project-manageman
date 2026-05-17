@@ -64,6 +64,15 @@ export default function ProjectDetails() {
   const [generatingAI, setGeneratingAI] = useState(false);
   const chatEndRef = React.useRef<HTMLDivElement>(null);
 
+  function refreshGanttData(projectId = id) {
+    if (!projectId) return;
+    setGanttLoading(true);
+    api.projects.gantt(projectId)
+      .then(setGanttData)
+      .catch(console.error)
+      .finally(() => setGanttLoading(false));
+  }
+
   useEffect(() => {
     if (activeTab === 'ai') {
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -130,11 +139,7 @@ export default function ProjectDetails() {
 
   useEffect(() => {
     if (!id || activeTab !== 'gantt' || ganttData || ganttLoading) return;
-    setGanttLoading(true);
-    api.projects.gantt(id)
-      .then(setGanttData)
-      .catch(console.error)
-      .finally(() => setGanttLoading(false));
+    refreshGanttData(id);
   }, [activeTab, ganttData, ganttLoading, id]);
 
   // ── Skeleton ────────────────────────────────────────────────────────────────
@@ -247,11 +252,20 @@ export default function ProjectDetails() {
   function handleTaskUpdate(updated: Task) {
     setTasks(prev => prev.map(t => t.id === updated.id ? updated : t));
     setSelectedTask(updated);
+    refreshGanttData(updated.projectId);
   }
 
   function handleTaskDelete(id: string) {
     setTasks(prev => prev.filter(t => t.id !== id));
     setSelectedTask(null);
+    refreshGanttData();
+  }
+
+  function handleGanttTaskOpen(taskId: string) {
+    const task = tasks.find((item) => item.id === taskId);
+    if (task) {
+      setSelectedTask(task);
+    }
   }
 
   const TABS: { id: Tab; label: string }[] = [
@@ -451,6 +465,7 @@ export default function ProjectDetails() {
               members={members}
               loading={ganttLoading}
               isRTL={isRTL}
+              onTaskOpen={handleGanttTaskOpen}
             />
           )}
 
