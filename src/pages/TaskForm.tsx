@@ -95,7 +95,19 @@ export default function TaskForm() {
     setLoading(true);
     setError(null);
     try {
-      await api.tasks.save(formData);
+      const payload = { ...formData };
+      let extraDescription = "";
+      if (images.length > 0) {
+        extraDescription += `\n\n[Attachments: ${images.length} image(s)]`;
+      }
+      if (recordings.length > 0) {
+        extraDescription += `\n\n[Attachments: ${recordings.length} audio recording(s)]`;
+      }
+      if (extraDescription) {
+        payload.description = (payload.description || '') + extraDescription;
+      }
+
+      await api.tasks.save(payload);
       navigate(formData.projectId ? `/projects/${formData.projectId}` : '/');
     } catch (err) {
       console.error(err);
