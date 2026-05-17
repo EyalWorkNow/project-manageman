@@ -66,6 +66,10 @@ export const api = {
     remove: (projectId: string, memberId: string): Promise<{ ok: boolean }> =>
       fetch(`/api/projects/${projectId}/members/${memberId}`, { method: 'DELETE' }).then(r => handleResponse<{ ok: boolean }>(r)),
   },
+  users: {
+    list: (): Promise<ProjectMember[]> =>
+      fetch('/api/users').then(r => handleResponse<ProjectMember[]>(r)),
+  },
   system: {
     status: (): Promise<SystemStatus> =>
       fetch('/api/system/status').then(r => handleResponse<SystemStatus>(r)),

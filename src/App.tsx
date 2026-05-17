@@ -21,6 +21,7 @@ import TaskForm from './pages/TaskForm';
 import CustomerView from './pages/CustomerView';
 import Submission from './pages/Submission';
 import AiChat from './pages/AiChat';
+import SignIn from './pages/SignIn';
 import { api } from './services/api';
 import { cn } from './lib/utils';
 import { I18nProvider, useI18n } from './lib/i18n';
@@ -65,7 +66,7 @@ function NavLink({ to, icon, label, badge, highlight }: NavItem) {
   );
 }
 
-function Navigation({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
+function Navigation({ mobileOpen, onClose, onSignOut }: { mobileOpen: boolean; onClose: () => void; onSignOut: () => void }) {
   const location = useLocation();
   const { t, language, setLanguage, isRTL } = useI18n();
   const isCustomerView = location.pathname.includes('customer-view');
@@ -159,7 +160,10 @@ function Navigation({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () 
           <span className="text-xs font-medium">{language === 'en' ? 'עברית' : 'English'}</span>
         </button>
 
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer">
+        <div
+          onClick={onSignOut}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer"
+        >
           <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-white font-bold text-xs shrink-0 border border-white/10">
             AR
           </div>
@@ -169,6 +173,18 @@ function Navigation({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () 
           </div>
           <ArrowRight2 variant="Linear" color="currentColor" size={14} className="text-zinc-600 shrink-0" />
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onSignOut();
+          }}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-white/8 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer text-sm font-medium"
+        >
+          <CloseCircle variant="Linear" color="currentColor" size={16} />
+          <span>{isRTL ? 'התנתקות' : 'Sign out'}</span>
+        </button>
       </div>
     </div>
   );
@@ -213,7 +229,7 @@ function MobileTopBar({ onMenuOpen }: { onMenuOpen: () => void }) {
   );
 }
 
-function Layout({ children }: { children: React.ReactNode }) {
+function Layout({ children, onSignOut }: { children: React.ReactNode; onSignOut: () => void }) {
   const location = useLocation();
   const { isRTL } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -221,7 +237,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={cn('min-h-screen bg-[#F6F7FB] flex text-zinc-900', isRTL && 'rtl')}>
-      <Navigation mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <Navigation mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} onSignOut={onSignOut} />
       <MobileTopBar onMenuOpen={() => setMobileOpen(true)} />
       <main className={cn(
         'flex-1 min-w-0',
@@ -236,23 +252,52 @@ function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AppShell() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('pm-auth') === '1' || sessionStorage.getItem('pm-auth') === '1';
+  });
+
+  function handleSignIn(rememberMe: boolean) {
+    const storage = rememberMe ? localStorage : sessionStorage;
+    const otherStorage = rememberMe ? sessionStorage : localStorage;
+    storage.setItem('pm-auth', '1');
+    otherStorage.removeItem('pm-auth');
+    setIsAuthenticated(true);
+  }
+
+  function handleSignOut() {
+    localStorage.removeItem('pm-auth');
+    sessionStorage.removeItem('pm-auth');
+    setIsAuthenticated(false);
+  }
+
+  if (!isAuthenticated) {
+    return <SignIn onSignIn={handleSignIn} />;
+  }
+
+  return (
+    <Layout onSignOut={handleSignOut}>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/submission" element={<Submission />} />
+        <Route path="/projects/new" element={<ProjectForm />} />
+        <Route path="/projects/edit/:id" element={<ProjectForm />} />
+        <Route path="/projects/:id" element={<ProjectDetails />} />
+        <Route path="/projects/:id/customer-view" element={<CustomerView />} />
+        <Route path="/tasks/new" element={<TaskForm />} />
+        <Route path="/tasks/edit/:taskId" element={<TaskForm />} />
+        <Route path="/ai-chat" element={<AiChat />} />
+      </Routes>
+    </Layout>
+  );
+}
+
 export default function App() {
   return (
     <I18nProvider>
       <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/submission" element={<Submission />} />
-            <Route path="/projects/new" element={<ProjectForm />} />
-            <Route path="/projects/edit/:id" element={<ProjectForm />} />
-            <Route path="/projects/:id" element={<ProjectDetails />} />
-            <Route path="/projects/:id/customer-view" element={<CustomerView />} />
-            <Route path="/tasks/new" element={<TaskForm />} />
-            <Route path="/tasks/edit/:taskId" element={<TaskForm />} />
-            <Route path="/ai-chat" element={<AiChat />} />
-          </Routes>
-        </Layout>
+        <AppShell />
       </BrowserRouter>
     </I18nProvider>
   );

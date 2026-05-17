@@ -4,9 +4,9 @@ import {
   PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Add, Calendar1 } from 'iconsax-react';
+import { Add, Calendar1, CloseCircle, Profile2User } from 'iconsax-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Task, TaskStatus, STATUS_TRANSLATION_KEYS } from '../types';
+import { ProjectMember, Task, TaskStatus, STATUS_TRANSLATION_KEYS } from '../types';
 import { cn, formatDate, STATUS_DOT, PRIORITY_DOT, daysUntil } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
 import { api } from '../services/api';
@@ -119,23 +119,116 @@ interface ColumnProps {
   dot: string;
   bg: string;
   tasks: Task[];
+  members: ProjectMember[];
+  allUsers?: ProjectMember[];
   activeId: string | null;
   onOpen: (t: Task) => void;
-  onAdd: (status: TaskStatus, title: string) => void;
+  onAdd: (status: TaskStatus, title: string, assignees: string[]) => void;
 }
 
-function KanbanColumn({ status, dot, bg, tasks, activeId, onOpen, onAdd }: ColumnProps) {
+function KanbanColumn({ status, dot, bg, tasks, members, allUsers, activeId, onOpen, onAdd }: ColumnProps) {
   const { t, isRTL } = useI18n();
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [selectedMembers, setSelectedMembers] = useState<ProjectMember[]>([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
+  const [mentionEnd, setMentionEnd] = useState<number | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const searchSource = allUsers && allUsers.length > 0 ? allUsers : members;
+
+  const availableMembers = searchSource.filter((member) => (
+    !selectedMembers.some((selected) => selected.id === member.id)
+  ));
+  const filteredMembers = availableMembers.filter((member) => {
+    const query = mentionQuery.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      member.name.toLowerCase().includes(query)
+      || member.email.toLowerCase().includes(query)
+      || (member.title || '').toLowerCase().includes(query)
+    );
+  });
+
+  function resetComposer() {
+    setNewTitle('');
+    setSelectedMembers([]);
+    setMentionOpen(false);
+    setMentionQuery('');
+    setMentionStart(null);
+    setMentionEnd(null);
+  }
+
+  function closeComposer() {
+    setAdding(false);
+    resetComposer();
+  }
+
+  function updateMentionState(value: string, caretPosition: number) {
+    const textBeforeCaret = value.slice(0, caretPosition);
+    const atIndex = textBeforeCaret.lastIndexOf('@');
+    const hasTrigger = atIndex >= 0
+      && (atIndex === 0 || /\s/.test(textBeforeCaret[atIndex - 1]))
+      && !/\s/.test(textBeforeCaret.slice(atIndex + 1));
+
+    if (!hasTrigger || availableMembers.length === 0) {
+      setMentionOpen(false);
+      setMentionQuery('');
+      setMentionStart(null);
+      setMentionEnd(null);
+      return;
+    }
+
+    setMentionOpen(true);
+    setMentionQuery(textBeforeCaret.slice(atIndex + 1));
+    setMentionStart(atIndex);
+    setMentionEnd(caretPosition);
+  }
+
+  function handleTitleChange(value: string, caretPosition: number) {
+    setNewTitle(value);
+    updateMentionState(value, caretPosition);
+  }
+
+  function handleMemberSelect(member: ProjectMember) {
+    setSelectedMembers((current) => (
+      current.some((selected) => selected.id === member.id)
+        ? current
+        : [...current, member]
+    ));
+
+    if (mentionStart === null || mentionEnd === null) {
+      setMentionOpen(false);
+      setMentionQuery('');
+      return;
+    }
+
+    const before = newTitle.slice(0, mentionStart);
+    const after = newTitle.slice(mentionEnd);
+    const nextTitle = `${before}${after}`.replace(/\s{2,}/g, ' ').trimStart();
+    const nextCaretPosition = before.length;
+
+    setNewTitle(nextTitle);
+    setMentionOpen(false);
+    setMentionQuery('');
+    setMentionStart(null);
+    setMentionEnd(null);
+
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCaretPosition, nextCaretPosition);
+    });
+  }
 
   function submit() {
     const title = newTitle.trim();
     if (!title) return;
-    onAdd(status, title);
-    setNewTitle('');
+    onAdd(status, title, selectedMembers.map((member) => member.name));
     setAdding(false);
+    resetComposer();
   }
 
   return (
@@ -187,23 +280,107 @@ function KanbanColumn({ status, dot, bg, tasks, activeId, onOpen, onAdd }: Colum
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.97 }}
               transition={{ duration: 0.12 }}
-              className="bg-white border-2 border-[#0073EA] rounded-xl p-2.5 space-y-2"
+              className="relative bg-white border-2 border-[#0073EA] rounded-xl p-2.5 space-y-2"
             >
+              {selectedMembers.length > 0 && (
+                <div className={cn('flex flex-wrap gap-1.5', isRTL && 'flex-row-reverse')}>
+                  {selectedMembers.map((member) => (
+                    <span
+                      key={member.id}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full bg-[#0F172A] px-2 py-1 text-[10px] font-semibold text-white',
+                        isRTL && 'flex-row-reverse'
+                      )}
+                    >
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/15 text-[8px] font-bold">
+                        {initials(member.name)}
+                      </span>
+                      <span className="max-w-[110px] truncate">{member.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMembers((current) => current.filter((selected) => selected.id !== member.id))}
+                        className="cursor-pointer text-white/80 hover:text-white"
+                        aria-label={isRTL ? `הסר את ${member.name}` : `Remove ${member.name}`}
+                      >
+                        <CloseCircle size={11} color="currentColor" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
               <textarea
+                ref={textareaRef}
                 autoFocus
                 value={newTitle}
-                onChange={e => setNewTitle(e.target.value)}
+                onChange={(e) => handleTitleChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
                 onKeyDown={e => {
+                  if (mentionOpen && filteredMembers.length > 0 && (e.key === 'Enter' || e.key === 'Tab')) {
+                    e.preventDefault();
+                    handleMemberSelect(filteredMembers[0]);
+                    return;
+                  }
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
-                  if (e.key === 'Escape') { setAdding(false); setNewTitle(''); }
+                  if (e.key === 'Escape') {
+                    if (mentionOpen) {
+                      setMentionOpen(false);
+                      setMentionQuery('');
+                      setMentionStart(null);
+                      setMentionEnd(null);
+                      return;
+                    }
+                    closeComposer();
+                  }
                 }}
-                placeholder={isRTL ? 'שם המשימה...' : 'Task title...'}
+                placeholder={isRTL ? 'שם המשימה... כתוב @ כדי לתייג משתתפים' : 'Task title... type @ to mention participants'}
                 rows={2}
                 className={cn(
                   'w-full text-[12px] text-[#1F2D3D] placeholder:text-[#C5CAD6] resize-none outline-none leading-snug bg-transparent',
                   isRTL && 'text-right'
                 )}
               />
+              {mentionOpen && (
+                <div className="absolute inset-x-2 top-full z-20 mt-1 rounded-xl border border-[#D8E0EB] bg-white p-1.5 shadow-[0_16px_40px_rgba(15,23,42,0.16)]">
+                  <div className="max-h-52 overflow-y-auto">
+                    {filteredMembers.length > 0 ? (
+                      filteredMembers.map((member) => (
+                        <button
+                          key={member.id}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handleMemberSelect(member)}
+                          className={cn(
+                            'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-[#F6F8FC] cursor-pointer',
+                            isRTL && 'flex-row-reverse text-right'
+                          )}
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EEF3FF] text-[10px] font-bold text-[#1D4ED8]">
+                            {initials(member.name)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[11px] font-semibold text-[#111827]">{member.name}</p>
+                            <p className="truncate text-[10px] text-[#6B7280]">
+                              {member.title || member.email}
+                            </p>
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className={cn('px-2.5 py-2 text-[11px] text-[#6B7280]', isRTL && 'text-right')}>
+                        {isRTL ? 'לא נמצאו משתתפים מתאימים' : 'No matching participants found'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className={cn('flex items-center gap-1.5 text-[10px] text-[#94A3B8]', isRTL && 'flex-row-reverse')}>
+                <Profile2User size={12} color="currentColor" />
+                <span>
+                  {searchSource.length > 0
+                    ? (isRTL ? 'כתוב @ כדי לחפש משתמש ולצרף אותו למשימה' : 'Type @ to search users and add them to the task')
+                    : (isRTL ? 'אין משתמשים זמינים במערכת כרגע' : 'No users available in the system yet')}
+                </span>
+              </div>
               <div className={cn('flex items-center gap-1.5', isRTL && 'flex-row-reverse')}>
                 <button
                   onClick={submit}
@@ -212,7 +389,7 @@ function KanbanColumn({ status, dot, bg, tasks, activeId, onOpen, onAdd }: Colum
                   {isRTL ? 'הוסף' : 'Add'}
                 </button>
                 <button
-                  onClick={() => { setAdding(false); setNewTitle(''); }}
+                  onClick={closeComposer}
                   className="text-[10px] font-semibold px-2.5 py-1 text-[#6B7A8D] hover:text-[#1F2D3D] transition-colors cursor-pointer"
                 >
                   {isRTL ? 'ביטול' : 'Cancel'}
@@ -303,11 +480,13 @@ function ConfirmMoveModal({
 interface KanbanBoardProps {
   tasks: Task[];
   projectId: string;
+  members: ProjectMember[];
+  allUsers?: ProjectMember[];
   onTaskOpen: (task: Task) => void;
   onTasksChange: (tasks: Task[]) => void;
 }
 
-export default function KanbanBoard({ tasks, projectId, onTaskOpen, onTasksChange }: KanbanBoardProps) {
+export default function KanbanBoard({ tasks, projectId, members, allUsers, onTaskOpen, onTasksChange }: KanbanBoardProps) {
   const { isRTL } = useI18n();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
@@ -355,11 +534,11 @@ export default function KanbanBoard({ tasks, projectId, onTaskOpen, onTasksChang
 
   const activeTask = tasks.find(t => t.id === activeId);
 
-  async function handleAdd(status: TaskStatus, title: string) {
+  async function handleAdd(status: TaskStatus, title: string, assignees: string[]) {
     try {
       const newTask = await api.tasks.save({
         projectId, title, status,
-        description: '', assignee: '', priority: 'Medium',
+        description: '', assignee: assignees.join(', '), priority: 'Medium',
         dueDate: '', isBlocked: false, blockerDescription: '', internalNotes: '',
       } as Partial<Task>);
       onTasksChange([...tasks, newTask]);
@@ -386,6 +565,8 @@ export default function KanbanBoard({ tasks, projectId, onTaskOpen, onTasksChang
               dot={dot}
               bg={bg}
               tasks={byStatus(status)}
+              members={members}
+              allUsers={allUsers}
               activeId={activeId}
               onOpen={onTaskOpen}
               onAdd={handleAdd}

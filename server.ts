@@ -1205,6 +1205,27 @@ app.get("/api/projects", async (_req, res) => {
   try { res.json(await getProjects()); } catch (e) { res.status(500).json({error: String(e)}); }
 });
 
+app.get("/api/users", async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `
+        SELECT
+          id,
+          full_name AS name,
+          email,
+          title
+        FROM users
+        WHERE status = 'active'
+        ORDER BY full_name ASC
+        LIMIT 1000
+      `
+    );
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 app.post("/api/projects", async (req, res) => {
   const validation = validateProjectInput(req.body);
   if (validation.ok === false) return res.status(400).json({ error: validation.error, details: validation.details });
@@ -1368,15 +1389,28 @@ app.post("/api/tasks", async (req, res) => {
             await pool.query(
               `
                 SELECT DISTINCT u.id, u.full_name
-                FROM project_members pm
-                JOIN users u ON u.id = pm.user_id
-                WHERE pm.project_id = $1
-                  AND pm.left_at IS NULL
+                FROM users u
+                WHERE u.org_id = $1
+                  AND u.status = 'active'
                   AND LOWER(u.full_name) = ANY($2::text[])
               `,
-              [validation.value.projectId, assigneeNames],
+              [project.org_id, assigneeNames],
             )
           ).rows;
+
+    for (const assignee of matchedAssignees) {
+      await pool.query(
+        `
+          INSERT INTO project_members (
+            project_id, user_id, project_role, allocation_percent, joined_at, left_at
+          )
+          VALUES ($1, $2, 'contributor', 35, NOW(), NULL)
+          ON CONFLICT (project_id, user_id) DO UPDATE
+          SET left_at = NULL
+        `,
+        [validation.value.projectId, assignee.id],
+      );
+    }
 
     const taskId = existing?.id || validation.value.id;
     const sortOrder =

@@ -122,6 +122,7 @@ export default function ProjectDetails() {
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [allUsers, setAllUsers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [ganttData, setGanttData] = useState<ProjectGanttData | null>(null);
@@ -162,6 +163,7 @@ export default function ProjectDetails() {
       setProject(null);
       setTasks([]);
       setMembers([]);
+      setAllUsers([]);
       setGanttData(null);
       setDecisionLog([]);
 
@@ -173,10 +175,11 @@ export default function ProjectDetails() {
         setTasks(proj.tasks || []);
         setMembers(proj.members || []);
 
-        const [membersResult, ganttResult, decisionResult] = await Promise.allSettled([
+        const [membersResult, ganttResult, decisionResult, usersResult] = await Promise.allSettled([
           api.members.list(id),
           api.projects.gantt(id),
           api.insights.decisionLog(id),
+          api.users.list(),
         ]);
 
         if (cancelled) return;
@@ -185,6 +188,12 @@ export default function ProjectDetails() {
           setMembers(membersResult.value);
         } else {
           console.error(membersResult.reason);
+        }
+
+        if (usersResult.status === 'fulfilled') {
+          setAllUsers(usersResult.value);
+        } else {
+          console.error(usersResult.reason);
         }
 
         if (ganttResult.status === 'fulfilled') {
@@ -629,6 +638,8 @@ export default function ProjectDetails() {
                 <KanbanBoard
                   tasks={tasks}
                   projectId={id!}
+                  members={members}
+                  allUsers={allUsers}
                   onTaskOpen={setSelectedTask}
                   onTasksChange={setTasks}
                 />
