@@ -229,7 +229,7 @@ export function RecentActivity({ tasks }: { tasks: Task[] }) {
 export function TeamOverview() {
   const { t, isRTL } = useI18n();
   const members = [
-    { name: isRTL ? 'אלכס ריברה' : 'Alex Rivera', role: t('nav.admin') || 'Lead PM', active: true, initials: 'AR', from: 'from-zinc-800', to: 'to-zinc-900' },
+    { name: isRTL ? 'אייל עטיה' : 'EYAL ATIA', role: t('nav.admin') || 'Lead PM', active: true, initials: 'EA', from: 'from-zinc-800', to: 'to-zinc-900' },
     { name: isRTL ? 'שרה מילר' : 'Sarah Miller', role: isRTL ? 'ארכיטקטית' : 'Architect', active: true, initials: 'SM', from: 'from-zinc-700', to: 'to-zinc-800' },
     { name: isRTL ? 'ג׳יימס צ׳ן' : 'James Chen', role: isRTL ? 'מנהל פרויקט' : 'Project Manager', active: false, initials: 'JC', from: 'from-zinc-600', to: 'to-zinc-700' },
   ];

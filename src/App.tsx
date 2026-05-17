@@ -165,10 +165,10 @@ function Navigation({ mobileOpen, onClose, onSignOut }: { mobileOpen: boolean; o
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer"
         >
           <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-white font-bold text-xs shrink-0 border border-white/10">
-            AR
+            EA
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">Alex Rivera</p>
+            <p className="text-sm font-semibold text-white truncate">EYAL ATIA</p>
             <p className="text-[10px] text-zinc-500 font-medium">{isRTL ? 'מנהל מערכת' : 'Administrator'}</p>
           </div>
           <ArrowRight2 variant="Linear" color="currentColor" size={14} className="text-zinc-600 shrink-0" />

@@ -4,8 +4,8 @@ import { cn } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
 
 const DEMO_CREDENTIALS = {
-  name: 'Alex Rivera',
-  password: 'Workspace-2026',
+  name: 'EYAL ATIA',
+  password: 'EYAL ATIA',
 };
 
 interface SignInProps {
@@ -24,7 +24,7 @@ export default function SignIn({ onSignIn }: SignInProps) {
         title: 'התחברות',
         subtitle: 'התחבר כדי להמשיך ללוח הניהול של הפרויקטים.',
         name: 'שם מלא',
-        namePlaceholder: 'אלכס ריברה',
+        namePlaceholder: 'אייל עטיה',
         password: 'סיסמה',
         passwordPlaceholder: 'הקלד סיסמה',
         remember: 'זכור אותי',
@@ -44,7 +44,7 @@ export default function SignIn({ onSignIn }: SignInProps) {
         title: 'Sign in',
         subtitle: 'Access the PM workspace with your name and password.',
         name: 'Full Name',
-        namePlaceholder: 'Alex Rivera',
+        namePlaceholder: 'EYAL ATIA',
         password: 'Password',
         passwordPlaceholder: 'Enter your password',
         remember: 'Remember me',
