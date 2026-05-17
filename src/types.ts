@@ -80,6 +80,7 @@ export interface Task {
   taskType?: string;
   baselineStartDate?: string;
   baselineEndDate?: string;
+  displayColor?: string;
 }
 
 export interface AISummary {
@@ -154,6 +155,7 @@ export interface GanttTimelineTask {
   baselineStartDate: string | null;
   baselineEndDate: string | null;
   commentsCount: number;
+  displayColor?: string | null;
 }
 
 export interface GanttMilestone {

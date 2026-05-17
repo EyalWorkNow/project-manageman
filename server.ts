@@ -1331,7 +1331,8 @@ INSTRUCTIONS:
 - Do not make up information not present in the data
 - If a question cannot be answered from the data, say so clearly
 - For status questions, always mention specific project/task names
-- Keep responses under 300 words unless more detail is genuinely needed`;
+- Keep responses under 300 words unless more detail is genuinely needed
+- CRITICAL: DO NOT use markdown bolding (double asterisks, i.e., "**") in your response under any circumstances. Instead of "**bold text**", use normal text, uppercase names, clean spacing, bullet points, or list separators to emphasize. Do not output "**" at all.`;
 
   try {
     const response = await ai.models.generateContent({
