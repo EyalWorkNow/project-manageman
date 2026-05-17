@@ -5,7 +5,7 @@ import {
   Profile2User, FolderOpen, Send2, DocumentText, MessageText, Flash,
 } from 'iconsax-react';
 import { motion } from 'motion/react';
-import { Project, Task, AISummary, ProjectGanttData, ProjectMember, STATUS_TRANSLATION_KEYS } from '../types';
+import { Project, Task, AISummary, ProjectGanttData, ProjectMember, ProjectDecisionItem, STATUS_TRANSLATION_KEYS } from '../types';
 import { api } from '../services/api';
 import { cn, formatDate, daysUntil, STATUS_COLORS, PRIORITY_COLORS, STATUS_DOT, PRIORITY_DOT } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
@@ -55,6 +55,7 @@ export default function ProjectDetails() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [ganttData, setGanttData] = useState<ProjectGanttData | null>(null);
   const [ganttLoading, setGanttLoading] = useState(false);
+  const [decisionLog, setDecisionLog] = useState<ProjectDecisionItem[]>([]);
 
   const [activeTab, setActiveTab] = useState<Tab>('board');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -90,6 +91,7 @@ export default function ProjectDetails() {
       setTasks([]);
       setMembers([]);
       setGanttData(null);
+      setDecisionLog([]);
 
       try {
         const proj = await api.projects.get(id);
@@ -99,9 +101,10 @@ export default function ProjectDetails() {
         setTasks(proj.tasks || []);
         setMembers(proj.members || []);
 
-        const [membersResult, ganttResult] = await Promise.allSettled([
+        const [membersResult, ganttResult, decisionResult] = await Promise.allSettled([
           api.members.list(id),
           api.projects.gantt(id),
+          api.insights.decisionLog(id),
         ]);
 
         if (cancelled) return;
@@ -116,6 +119,12 @@ export default function ProjectDetails() {
           setGanttData(ganttResult.value);
         } else {
           console.error(ganttResult.reason);
+        }
+
+        if (decisionResult.status === 'fulfilled') {
+          setDecisionLog(decisionResult.value);
+        } else {
+          console.error(decisionResult.reason);
         }
       } catch (error) {
         console.error(error);
@@ -201,6 +210,7 @@ export default function ProjectDetails() {
     ganttData?.health ? `Critical path tasks: ${ganttData.health.criticalPathTasks}. Overdue tasks: ${ganttData.health.overdueTasks}.` : '',
     ganttData?.milestones?.length ? `Milestones: ${ganttData.milestones.map((milestone) => `${milestone.milestoneName} [${milestone.status}] due ${milestone.dueDate}`).join('; ')}` : '',
     ganttData?.resources?.length ? `Resource load: ${ganttData.resources.slice(0, 6).map((resource) => `${resource.fullName} ${Math.round(resource.openTaskAllocationPercent || 0)}% allocation across ${resource.openTasks} open tasks`).join('; ')}` : '',
+    decisionLog.length ? `Decision log: ${decisionLog.slice(0, 6).map((item) => `${item.summary}${item.taskTitle ? ` [${item.taskTitle}]` : ''}`).join('; ')}` : '',
     `Tasks: ${tasks.map(t => `${t.title} [${t.status}]`).join(', ')}`,
   ].filter(Boolean).join('. ');
 
@@ -603,6 +613,84 @@ export default function ProjectDetails() {
                       <Profile2User size={18} className="text-violet-500 flex-shrink-0" variant="Bold" />
                       <span>{isRTL ? 'איזון עומסים' : 'Resource Rebalance'}</span>
                     </button>
+
+                    <button
+                      onClick={() => runPresetAiAction(
+                        isRTL ? 'הכנה לישיבת סטטוס' : 'Meeting Prep',
+                        isRTL
+                          ? 'הכן דף הכנה לישיבת סטטוס: על מה לשאול, אילו החלטות חייבות לצאת מהפגישה, איפה חסר owner, ואילו חסמים דורשים escalation.'
+                          : 'Prepare a project status meeting brief: what to ask, which decisions must come out of the meeting, where ownership is missing, and which blockers need escalation.',
+                      )}
+                      disabled={generatingAI}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200/60 hover:border-cyan-300 hover:bg-cyan-50 transition-all text-sm font-semibold text-zinc-700 hover:text-cyan-700 disabled:opacity-50",
+                        isRTL && "flex-row-reverse text-right"
+                      )}
+                    >
+                      <DocumentText size={18} className="text-cyan-500 flex-shrink-0" variant="Bold" />
+                      <span>{isRTL ? 'הכנה לפגישה' : 'Meeting Prep'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => runPresetAiAction(
+                        isRTL ? 'בדיקת סיכון שינויי היקף' : 'Scope Change Risk Check',
+                        isRTL
+                          ? 'בדוק אם שינוי או הוספת משימה חדשה יסכנו את הלו״ז, המשאבים או שרשרת התלותים. תן המלצה איך להכניס שינוי בלי לגרום ל-scope creep לא נשלט.'
+                          : 'Evaluate change-request risk for this project: where added scope would break the timeline, resource plan, or dependency chain, and how to contain scope creep.',
+                      )}
+                      disabled={generatingAI}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200/60 hover:border-rose-300 hover:bg-rose-50 transition-all text-sm font-semibold text-zinc-700 hover:text-rose-700 disabled:opacity-50",
+                        isRTL && "flex-row-reverse text-right"
+                      )}
+                    >
+                      <Warning2 size={18} className="text-rose-500 flex-shrink-0" variant="Bold" />
+                      <span>{isRTL ? 'סיכון שינוי היקף' : 'Scope Change Risk'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => runPresetAiAction(
+                        isRTL ? 'ביטחון באבני דרך' : 'Milestone Confidence Review',
+                        isRTL
+                          ? 'נתח את אבני הדרך והערכת ההגעה אליהן: אילו אבני דרך בסיכון, למה, ומה הפעולות שצריך לעשות השבוע כדי להעלות את רמת הביטחון.'
+                          : 'Review milestone confidence: identify which milestones are at risk, why, and what should happen this week to improve confidence.',
+                      )}
+                      disabled={generatingAI}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200/60 hover:border-amber-300 hover:bg-amber-50 transition-all text-sm font-semibold text-zinc-700 hover:text-amber-700 disabled:opacity-50",
+                        isRTL && "flex-row-reverse text-right"
+                      )}
+                    >
+                      <Eye size={18} className="text-amber-500 flex-shrink-0" variant="Bold" />
+                      <span>{isRTL ? 'ביטחון באבני דרך' : 'Milestone Confidence'}</span>
+                    </button>
+                  </div>
+
+                  <div className="border-t border-zinc-100 p-5">
+                    <div className={cn('flex items-center gap-2 mb-3', isRTL && 'flex-row-reverse')}>
+                      <Warning2 size={14} className="text-zinc-500" variant="Bold" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                        {isRTL ? 'יומן החלטות' : 'Decision Feed'}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {decisionLog.length === 0 ? (
+                        <p className={cn("text-xs text-zinc-500", isRTL && "text-right")}>
+                          {isRTL ? 'אין החלטות אחרונות זמינות.' : 'No recent decision items are available.'}
+                        </p>
+                      ) : (
+                        decisionLog.slice(0, 6).map((item) => (
+                          <div key={item.id} className="rounded-xl border border-zinc-200/60 bg-zinc-50/70 px-3 py-2">
+                            <p className={cn("text-xs font-semibold text-zinc-900 leading-relaxed", isRTL && "text-right")}>
+                              {item.summary}
+                            </p>
+                            <p className={cn("mt-1 text-[10px] text-zinc-500", isRTL && "text-right")}>
+                              {[item.taskTitle, item.actorName, formatDate(item.createdAt)].filter(Boolean).join(' · ')}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                   
                   <div className="mt-auto p-5 bg-zinc-50/50 border-t border-zinc-100">

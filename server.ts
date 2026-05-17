@@ -18,10 +18,13 @@ import {
   type GanttResourceLoad,
   type GanttTimelineTask,
   type Project,
+  type ProjectDecisionItem,
   type ProjectGanttData,
   type ProjectMember,
   type ProjectStatus,
   type Task,
+  type TaskDependencyLink,
+  type TaskDetailContext,
   type TaskPriority,
   type TaskStatus,
 } from "./src/types";
@@ -67,7 +70,19 @@ const pool = new Pool({
 
 function toIsoDate(value: Date | string | null | undefined) {
   if (!value) return "";
-  return new Date(value).toISOString().split("T")[0];
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const directMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (directMatch) return directMatch[1];
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function mapDbProjectStatus(status: string): ProjectStatus {
@@ -79,6 +94,8 @@ function mapDbProjectStatus(status: string): ProjectStatus {
     case "cancelled":
       return "Blocked";
     case "draft":
+    case "planning":
+    case "at_risk":
       return "At Risk";
     default:
       return "On Track";
@@ -642,6 +659,171 @@ async function getProjectGantt(projectId: string): Promise<ProjectGanttData | nu
   };
 }
 
+function humanizeWords(value: string) {
+  return value.replace(/_/g, " ");
+}
+
+function summarizeDecisionEvent(eventType: string, message: string | null | undefined) {
+  const trimmed = readText(message);
+  const boilerplateMessages = new Set([
+    "Timeline progress updated.",
+    "Task updated from PM workspace.",
+    "Task status updated from board.",
+  ]);
+  if (trimmed && !boilerplateMessages.has(trimmed)) return trimmed;
+
+  switch (eventType) {
+    case "dependency_added":
+      return "Dependency added to the plan.";
+    case "dependency_removed":
+      return "Dependency removed from the plan.";
+    case "date_changed":
+      return "Task dates changed.";
+    case "progress_updated":
+      return "Task progress updated.";
+    case "risk_flagged":
+      return "Project risk flagged for follow-up.";
+    case "milestone_completed":
+      return "Milestone marked complete.";
+    case "milestone_created":
+      return "Milestone added to the project.";
+    case "task_status_changed":
+      return "Task status changed.";
+    case "blocked":
+      return "Task was marked blocked.";
+    case "unblocked":
+      return "Task was unblocked.";
+    default:
+      return humanizeWords(eventType);
+  }
+}
+
+async function getTaskDetailContext(taskId: string): Promise<TaskDetailContext> {
+  const [dependencyResult, activityResult] = await Promise.all([
+    pool.query(
+      `
+        SELECT
+          d.id,
+          CASE
+            WHEN d.successor_task_id = $1 THEN 'predecessor'
+            ELSE 'successor'
+          END AS direction,
+          linked.id AS task_id,
+          linked.task_key,
+          linked.title,
+          linked.status,
+          d.dependency_type,
+          d.lag_days,
+          d.is_blocking
+        FROM gantt_task_dependencies d
+        JOIN gantt_tasks linked
+          ON linked.id = CASE
+            WHEN d.successor_task_id = $1 THEN d.predecessor_task_id
+            ELSE d.successor_task_id
+          END
+        WHERE d.predecessor_task_id = $1
+           OR d.successor_task_id = $1
+        ORDER BY
+          CASE
+            WHEN d.successor_task_id = $1 THEN 0
+            ELSE 1
+          END,
+          linked.sort_order ASC,
+          linked.created_at ASC
+      `,
+      [taskId],
+    ),
+    pool.query(
+      `
+        SELECT
+          a.id,
+          a.task_id,
+          t.title AS task_title,
+          u.full_name AS actor_name,
+          a.event_type,
+          a.message,
+          a.created_at
+        FROM gantt_task_activity a
+        LEFT JOIN gantt_tasks t ON t.id = a.task_id
+        LEFT JOIN users u ON u.id = a.actor_user_id
+        WHERE a.task_id = $1
+        ORDER BY a.created_at DESC
+        LIMIT 12
+      `,
+      [taskId],
+    ),
+  ]);
+
+  return {
+    dependencies: dependencyResult.rows.map((row) => ({
+      id: row.id,
+      direction: row.direction,
+      taskId: row.task_id,
+      taskKey: row.task_key,
+      title: row.title,
+      status: row.status,
+      dependencyType: row.dependency_type,
+      lagDays: Number(row.lag_days ?? 0),
+      isBlocking: Boolean(row.is_blocking),
+    })) satisfies TaskDependencyLink[],
+    activity: activityResult.rows.map((row) => ({
+      id: row.id,
+      taskId: row.task_id,
+      taskTitle: row.task_title,
+      actorName: row.actor_name,
+      eventType: row.event_type,
+      message: row.message,
+      createdAt: new Date(row.created_at).toISOString(),
+    })),
+  };
+}
+
+async function getProjectDecisionLog(projectId: string): Promise<ProjectDecisionItem[]> {
+  const { rows } = await pool.query(
+    `
+      SELECT
+        a.id,
+        a.project_id,
+        a.task_id,
+        t.title AS task_title,
+        u.full_name AS actor_name,
+        a.event_type,
+        a.message,
+        a.created_at
+      FROM gantt_task_activity a
+      LEFT JOIN gantt_tasks t ON t.id = a.task_id
+      LEFT JOIN users u ON u.id = a.actor_user_id
+      WHERE a.project_id = $1
+        AND a.event_type IN (
+          'dependency_added',
+          'dependency_removed',
+          'date_changed',
+          'progress_updated',
+          'risk_flagged',
+          'blocked',
+          'unblocked',
+          'task_status_changed',
+          'milestone_created',
+          'milestone_completed'
+        )
+      ORDER BY a.created_at DESC
+      LIMIT 12
+    `,
+    [projectId],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    projectId: row.project_id,
+    taskId: row.task_id,
+    taskTitle: row.task_title,
+    actorName: row.actor_name,
+    decisionType: row.event_type,
+    summary: summarizeDecisionEvent(row.event_type, row.message),
+    createdAt: new Date(row.created_at).toISOString(),
+  })) satisfies ProjectDecisionItem[];
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -999,6 +1181,16 @@ app.get("/api/projects/:id/gantt", async (req, res) => {
   }
 });
 
+app.get("/api/projects/:id/decision-log", async (req, res) => {
+  try {
+    const project = await getProjectDbRow(req.params.id);
+    if (!project) return res.status(404).json({ error: "Project not found." });
+    res.json(await getProjectDecisionLog(req.params.id));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 app.put("/api/projects/:id", async (req, res) => {
   const validation = validateProjectInput(req.body);
   if (validation.ok === false) return res.status(400).json({ error: validation.error, details: validation.details });
@@ -1326,23 +1518,23 @@ app.post("/api/ai/chat", async (req, res) => {
   const projectsSummary = allProjects.map(p => ({
     id: p.id,
     name: p.name,
+    client: p.clientName,
     status: p.status,
-    manager: p.projectManager
+    manager: p.projectManager,
+    deadline: p.deadline,
   }));
 
-  const filteredTasks = allTasks
-    .filter(t => t.isBlocked || t.priority === "Critical" || t.status === "In Progress")
-    .slice(0, 150)
-    .map(t => ({
-      id: t.id,
-      projectId: t.projectId,
-      title: t.title,
-      status: t.status,
-      priority: t.priority,
-      isBlocked: t.isBlocked,
-      blockerDescription: t.blockerDescription,
-      assignee: t.assignee
-    }));
+  const filteredTasks = allTasks.map(t => ({
+    id: t.id,
+    projectId: t.projectId,
+    title: t.title,
+    status: t.status,
+    priority: t.priority,
+    assignee: t.assignee,
+    dueDate: t.dueDate,
+    isBlocked: t.isBlocked,
+    blockerDescription: t.blockerDescription || undefined,
+  }));
 
   const contextData = {
     projects: projectsSummary,
@@ -1362,11 +1554,21 @@ app.post("/api/ai/chat", async (req, res) => {
         inProgress: allTasks.filter((t) => t.status === "In Progress").length,
         waitingForClient: allTasks.filter((t) => t.status === "Waiting for Client").length,
         done: allTasks.filter((t) => t.status === "Done").length,
+        blocked: allTasks.filter((t) => t.status === "Blocked").length,
       },
-      criticalTasks: allTasks
-        .filter((t) => t.priority === "Critical" && t.status !== "Done")
-        .slice(0, 50)
-        .map(t => ({ id: t.id, title: t.title, projectId: t.projectId })),
+      atRiskProjects: allProjects
+        .filter((p) => p.status === "At Risk")
+        .map(p => ({ id: p.id, name: p.name, client: p.clientName, deadline: p.deadline, manager: p.projectManager })),
+      blockedProjects: allProjects
+        .filter((p) => p.status === "Blocked")
+        .map(p => ({ id: p.id, name: p.name, client: p.clientName, deadline: p.deadline })),
+      // Dashboard "projects at risk" metric = At Risk + Blocked combined
+      projectsNeedingAttention: allProjects
+        .filter((p) => p.status === "At Risk" || p.status === "Blocked")
+        .map(p => ({ id: p.id, name: p.name, client: p.clientName, status: p.status, deadline: p.deadline, manager: p.projectManager })),
+      criticalBlockedTasks: allTasks
+        .filter((t) => t.isBlocked && t.priority === "Critical")
+        .map(t => ({ id: t.id, title: t.title, projectId: t.projectId, blocker: t.blockerDescription })),
     },
   };
 
@@ -1394,7 +1596,8 @@ INSTRUCTIONS:
 - If a question cannot be answered from the data, say so clearly
 - For status questions, always mention specific project/task names
 - Keep responses under 300 words unless more detail is genuinely needed
-- CRITICAL: DO NOT use markdown bolding (double asterisks, i.e., "**") in your response under any circumstances. Instead of "**bold text**", use normal text, uppercase names, clean spacing, bullet points, or list separators to emphasize. Do not output "**" at all.`;
+- CRITICAL: DO NOT use markdown bolding (double asterisks, i.e., "**") in your response under any circumstances. Instead of "**bold text**", use normal text, uppercase names, clean spacing, bullet points, or list separators to emphasize. Do not output "**" at all.
+- IMPORTANT STATUS RULE: When the user asks about "at risk" projects, use the "projectsNeedingAttention" list which includes BOTH status="At Risk" AND status="Blocked" projects. The dashboard's "projects at risk" counter = atRisk + blocked combined. Never say there are zero at-risk projects if projectsNeedingAttention is non-empty.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -1475,6 +1678,16 @@ app.delete("/api/tasks/:id", async (req, res) => {
 });
 
 // GET comments for a task
+app.get("/api/tasks/:id/context", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT id FROM gantt_tasks WHERE id = $1 LIMIT 1`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: "Task not found." });
+    res.json(await getTaskDetailContext(req.params.id));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 app.get("/api/tasks/:id/comments", async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -1697,8 +1910,6 @@ Instructions:
 });
 
 async function startServer() {
-  // await loadDatabase();
-
   if (process.env.NODE_ENV !== "production") {
     const hmrPort = Number(process.env.HMR_PORT || 24679);
     const vite = await createViteServer({

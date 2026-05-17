@@ -191,6 +191,34 @@ export interface GanttActivityItem {
   createdAt: string;
 }
 
+export interface TaskDependencyLink {
+  id: string;
+  direction: 'predecessor' | 'successor';
+  taskId: string;
+  taskKey: string;
+  title: string;
+  status: string;
+  dependencyType: string;
+  lagDays: number;
+  isBlocking: boolean;
+}
+
+export interface TaskDetailContext {
+  dependencies: TaskDependencyLink[];
+  activity: GanttActivityItem[];
+}
+
+export interface ProjectDecisionItem {
+  id: string;
+  projectId: string;
+  taskId: string | null;
+  taskTitle: string | null;
+  actorName: string | null;
+  decisionType: string;
+  summary: string;
+  createdAt: string;
+}
+
 export interface ProjectGanttData {
   health: GanttProjectHealth;
   tasks: GanttTimelineTask[];

@@ -31,7 +31,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const [viewType, setViewType] = useState<'all' | 'active'>('all');
+  const [viewType, setViewType] = useState<'all' | 'active' | 'on_track' | 'at_risk' | 'blocked' | 'completed'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 6;
   const { t, isRTL } = useI18n();
@@ -94,9 +94,14 @@ export default function Dashboard() {
     p.clientName.toLowerCase().includes(normalizedQuery) ||
     p.projectManager.toLowerCase().includes(normalizedQuery)
   );
-  const visibleProjects = viewType === 'active'
-    ? filteredProjects.filter(p => p.status !== 'Completed')
-    : filteredProjects;
+  const visibleProjects = filteredProjects.filter(p => {
+    if (viewType === 'active') return p.status !== 'Completed';
+    if (viewType === 'on_track') return p.status === 'On Track';
+    if (viewType === 'at_risk') return p.status === 'At Risk';
+    if (viewType === 'blocked') return p.status === 'Blocked';
+    if (viewType === 'completed') return p.status === 'Completed';
+    return true;
+  });
 
   const totalPages = Math.max(1, Math.ceil(visibleProjects.length / ITEMS_PER_PAGE));
   const paginatedProjects = visibleProjects.slice(
@@ -274,12 +279,12 @@ export default function Dashboard() {
                     />
                   </div>
                 </div>
-                <div className={cn('flex items-center gap-3', isRTL && 'flex-row-reverse')}>
-                  <div className="flex items-center gap-1 p-1 bg-zinc-50/80 rounded-xl border border-zinc-200/60">
+                <div className={cn('flex items-center gap-3 w-full md:w-auto', isRTL && 'flex-row-reverse')}>
+                  <div className="flex items-center gap-1 p-1 bg-zinc-50/80 rounded-xl border border-zinc-200/60 overflow-x-auto max-w-full no-scrollbar">
                     <button
                       onClick={() => setViewType('all')}
                       className={cn(
-                        'px-4 py-1.5 text-[11px] font-semibold rounded-lg transition-all cursor-pointer',
+                        'px-3.5 py-1.5 text-[11px] font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
                         viewType === 'all' ? 'bg-white text-zinc-900 shadow-sm border border-zinc-200/50' : 'text-zinc-500 hover:text-zinc-700'
                       )}
                     >
@@ -288,11 +293,47 @@ export default function Dashboard() {
                     <button
                       onClick={() => setViewType('active')}
                       className={cn(
-                        'px-4 py-1.5 text-[11px] font-semibold rounded-lg transition-all cursor-pointer',
+                        'px-3.5 py-1.5 text-[11px] font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
                         viewType === 'active' ? 'bg-white text-zinc-900 shadow-sm border border-zinc-200/50' : 'text-zinc-500 hover:text-zinc-700'
                       )}
                     >
                       {isRTL ? 'פעילים' : 'Active'}
+                    </button>
+                    <button
+                      onClick={() => setViewType('on_track')}
+                      className={cn(
+                        'px-3.5 py-1.5 text-[11px] font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
+                        viewType === 'on_track' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-200/50 font-bold' : 'text-zinc-500 hover:text-zinc-700'
+                      )}
+                    >
+                      {isRTL ? 'במסלול' : 'On Track'}
+                    </button>
+                    <button
+                      onClick={() => setViewType('at_risk')}
+                      className={cn(
+                        'px-3.5 py-1.5 text-[11px] font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
+                        viewType === 'at_risk' ? 'bg-white text-amber-600 shadow-sm border border-zinc-200/50 font-bold' : 'text-zinc-500 hover:text-zinc-700'
+                      )}
+                    >
+                      {isRTL ? 'בסיכון' : 'At Risk'}
+                    </button>
+                    <button
+                      onClick={() => setViewType('blocked')}
+                      className={cn(
+                        'px-3.5 py-1.5 text-[11px] font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
+                        viewType === 'blocked' ? 'bg-white text-red-600 shadow-sm border border-zinc-200/50 font-bold' : 'text-zinc-500 hover:text-zinc-700'
+                      )}
+                    >
+                      {isRTL ? 'חסומים' : 'Blocked'}
+                    </button>
+                    <button
+                      onClick={() => setViewType('completed')}
+                      className={cn(
+                        'px-3.5 py-1.5 text-[11px] font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
+                        viewType === 'completed' ? 'bg-white text-zinc-900 shadow-sm border border-zinc-200/50 font-bold' : 'text-zinc-500 hover:text-zinc-700'
+                      )}
+                    >
+                      {isRTL ? 'הושלמו' : 'Completed'}
                     </button>
                   </div>
                 </div>

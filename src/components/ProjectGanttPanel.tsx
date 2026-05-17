@@ -134,6 +134,14 @@ export default function ProjectGanttPanel({ data, members, loading, isRTL, onTas
 
   const taskDates = data.tasks.flatMap((task) => [task.plannedStartDate, task.plannedEndDate]).filter(Boolean);
   const activeTasks = data.tasks.filter((task) => !['done', 'cancelled'].includes(task.taskStatus)).length;
+  const dependencyHotspots = [...data.tasks]
+    .filter((task) => task.blockingDependenciesCount > 0 || task.dependentTasksCount > 0)
+    .sort((left, right) => {
+      const leftScore = left.blockingDependenciesCount + left.dependentTasksCount + (left.isCriticalPath ? 2 : 0);
+      const rightScore = right.blockingDependenciesCount + right.dependentTasksCount + (right.isCriticalPath ? 2 : 0);
+      return rightScore - leftScore;
+    })
+    .slice(0, 4);
   const timelineStart = parseISO(taskDates[0] || data.health.startDate);
   const timelineEnd = parseISO(taskDates[taskDates.length - 1] || data.health.targetEndDate);
   const safeTimelineEnd = timelineEnd < timelineStart ? addDays(timelineStart, 1) : timelineEnd;
@@ -195,6 +203,53 @@ export default function ProjectGanttPanel({ data, members, loading, isRTL, onTas
             <MemberBadge key={member.id} member={member} />
           ))}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-zinc-200/70 bg-white p-5">
+        <div className={cn('mb-4 flex items-center gap-2', isRTL && 'flex-row-reverse')}>
+          <Routing size={16} color="#0073EA" />
+          <h3 className="text-sm font-bold text-zinc-900">{isRTL ? 'מוקדי תלותים' : 'Dependency Hotspots'}</h3>
+        </div>
+        {dependencyHotspots.length === 0 ? (
+          <p className={cn('text-xs text-zinc-500', isRTL && 'text-right')}>
+            {isRTL ? 'אין כרגע שרשראות תלות בולטות בפרויקט הזה.' : 'There are no major dependency chains in this project right now.'}
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {dependencyHotspots.map((task) => (
+              <button
+                key={task.taskId}
+                type="button"
+                onClick={() => onTaskOpen?.(task.taskId)}
+                className="rounded-xl border border-zinc-200/70 px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+              >
+                <div className={cn('flex items-start justify-between gap-3', isRTL && 'flex-row-reverse text-right')}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-zinc-900">{task.title}</p>
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      {task.taskKey}
+                      {task.isCriticalPath ? ` · ${isRTL ? 'נתיב קריטי' : 'Critical path'}` : ''}
+                    </p>
+                  </div>
+                  <div className={cn('rounded-full px-2 py-1 text-[10px] font-bold uppercase', task.timelineHealth === 'blocked' || task.timelineHealth === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-zinc-100 text-zinc-700')}>
+                    {task.timelineHealth.replace(/_/g, ' ')}
+                  </div>
+                </div>
+                <div className={cn('mt-3 flex flex-wrap gap-2', isRTL && 'flex-row-reverse')}>
+                  <span className="rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-semibold text-zinc-700">
+                    {isRTL ? `${task.blockingDependenciesCount} חוסמות` : `${task.blockingDependenciesCount} blockers`}
+                  </span>
+                  <span className="rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-semibold text-zinc-700">
+                    {isRTL ? `${task.dependentTasksCount} מושפעות` : `${task.dependentTasksCount} impacted`}
+                  </span>
+                  <span className="rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-semibold text-zinc-700">
+                    {Math.round(task.progressPercent)}%
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-zinc-200/70 bg-white">

@@ -7,6 +7,8 @@ import {
   Comment,
   ProjectMember,
   ProjectGanttData,
+  ProjectDecisionItem,
+  TaskDetailContext,
 } from '../types';
 
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -48,6 +50,8 @@ export const api = {
       fetch(`/api/tasks/${id}`, { method: 'DELETE' }).then(r => handleResponse<{ ok: boolean }>(r)),
     getComments: (taskId: string): Promise<Comment[]> =>
       fetch(`/api/tasks/${taskId}/comments`).then(r => handleResponse<Comment[]>(r)),
+    getContext: (taskId: string): Promise<TaskDetailContext> =>
+      fetch(`/api/tasks/${taskId}/context`).then(r => handleResponse<TaskDetailContext>(r)),
     addComment: (taskId: string, content: string, author: string): Promise<Comment> =>
       fetch(`/api/tasks/${taskId}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, author }) }).then(r => handleResponse<Comment>(r)),
   },
@@ -64,6 +68,10 @@ export const api = {
   system: {
     status: (): Promise<SystemStatus> =>
       fetch('/api/system/status').then(r => handleResponse<SystemStatus>(r)),
+  },
+  insights: {
+    decisionLog: (projectId: string): Promise<ProjectDecisionItem[]> =>
+      fetch(`/api/projects/${projectId}/decision-log`).then(r => handleResponse<ProjectDecisionItem[]>(r)),
   },
   ai: {
     summarize: (project: Project, tasks: Task[], language: 'en' | 'he' = 'en'): Promise<AISummary> =>
