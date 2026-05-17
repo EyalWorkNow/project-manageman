@@ -54,7 +54,10 @@ function TaskCard({ task, onOpen, ghost }: CardProps) {
     ? { transform: `translate3d(${transform.x}px,${transform.y}px,0)` }
     : undefined;
 
-  function handlePointerDown() { clickedRef.current = true; }
+  function handlePointerDown(e: React.PointerEvent) {
+    clickedRef.current = true;
+    listeners?.onPointerDown?.(e);
+  }
   function handleClick() {
     if (!isDragging && clickedRef.current) onOpen(task);
     clickedRef.current = false;
@@ -233,6 +236,68 @@ function KanbanColumn({ status, dot, bg, tasks, activeId, onOpen, onAdd }: Colum
   );
 }
 
+// ─── Confirm move modal ───────────────────────────────────────────────────────
+
+interface PendingMove {
+  task: Task;
+  newStatus: TaskStatus;
+}
+
+function ConfirmMoveModal({
+  move,
+  onConfirm,
+  onCancel,
+}: {
+  move: PendingMove;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { t, isRTL } = useI18n();
+  const newCol = COLUMNS.find(c => c.status === move.newStatus)!;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onCancel} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.93 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.93 }}
+        transition={{ duration: 0.15 }}
+        className="relative bg-white rounded-2xl shadow-2xl border border-[#E6E9EF] p-6 w-[340px] max-w-[90vw]"
+      >
+        <h3 className={cn('text-[15px] font-bold text-[#1F2D3D] mb-1', isRTL && 'text-right')}>
+          {isRTL ? 'שינוי סטטוס' : 'Move task?'}
+        </h3>
+        <p className={cn('text-xs text-[#6B7A8D] mb-4 leading-relaxed', isRTL && 'text-right')}>
+          {isRTL
+            ? `להעביר את "${move.task.title}" לסטטוס`
+            : `Move "${move.task.title}" to`}
+          {' '}
+          <span className="font-bold" style={{ color: newCol.dot }}>
+            {t(STATUS_TRANSLATION_KEYS[move.newStatus]) || move.newStatus}
+          </span>
+          {isRTL ? '?' : '?'}
+        </p>
+        <div className={cn('flex gap-2', isRTL && 'flex-row-reverse')}>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2 rounded-xl text-sm font-bold text-white transition-colors cursor-pointer"
+            style={{ backgroundColor: newCol.dot }}
+          >
+            {isRTL ? 'כן, העבר' : 'Move'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2 rounded-xl text-sm font-semibold text-[#6B7A8D] bg-[#F6F7FB] hover:bg-[#E6E9EF] transition-colors cursor-pointer"
+          >
+            {isRTL ? 'ביטול' : 'Cancel'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Board ────────────────────────────────────────────────────────────────────
 
 interface KanbanBoardProps {
@@ -245,6 +310,7 @@ interface KanbanBoardProps {
 export default function KanbanBoard({ tasks, projectId, onTaskOpen, onTasksChange }: KanbanBoardProps) {
   const { isRTL } = useI18n();
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -258,7 +324,7 @@ export default function KanbanBoard({ tasks, projectId, onTaskOpen, onTasksChang
     setActiveId(active.id as string);
   }
 
-  async function onDragEnd({ active, over }: DragEndEvent) {
+  function onDragEnd({ active, over }: DragEndEvent) {
     setActiveId(null);
     if (!over) return;
 
@@ -267,14 +333,24 @@ export default function KanbanBoard({ tasks, projectId, onTaskOpen, onTasksChang
     const task = tasks.find(t => t.id === taskId);
     if (!task || task.status === newStatus) return;
 
-    // Optimistic update
-    onTasksChange(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    setPendingMove({ task, newStatus });
+  }
 
+  async function confirmMove() {
+    if (!pendingMove) return;
+    const { task, newStatus } = pendingMove;
+    setPendingMove(null);
+
+    onTasksChange(tasks.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
     try {
-      await api.tasks.updateStatus(taskId, newStatus);
+      await api.tasks.updateStatus(task.id, newStatus);
     } catch {
-      onTasksChange(tasks); // revert
+      onTasksChange(tasks);
     }
+  }
+
+  function cancelMove() {
+    setPendingMove(null);
   }
 
   const activeTask = tasks.find(t => t.id === activeId);
@@ -295,36 +371,48 @@ export default function KanbanBoard({ tasks, projectId, onTaskOpen, onTasksChang
   const cols = isRTL ? [...COLUMNS].reverse() : COLUMNS;
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-    >
-      <div className={cn('flex gap-4 overflow-x-auto pb-4 px-6', isRTL && 'flex-row-reverse')}>
-        {cols.map(({ status, dot, bg }) => (
-          <KanbanColumn
-            key={status}
-            status={status}
-            dot={dot}
-            bg={bg}
-            tasks={byStatus(status)}
-            activeId={activeId}
-            onOpen={onTaskOpen}
-            onAdd={handleAdd}
-          />
-        ))}
-      </div>
+    <>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+      >
+        <div className={cn('flex gap-4 overflow-x-auto pb-4 px-6', isRTL && 'flex-row-reverse')}>
+          {cols.map(({ status, dot, bg }) => (
+            <KanbanColumn
+              key={status}
+              status={status}
+              dot={dot}
+              bg={bg}
+              tasks={byStatus(status)}
+              activeId={activeId}
+              onOpen={onTaskOpen}
+              onAdd={handleAdd}
+            />
+          ))}
+        </div>
 
-      <DragOverlay dropAnimation={{ duration: 180, easing: 'ease-out' }}>
-        {activeTask ? (
-          <div className="bg-white rounded-xl border border-[#0073EA] shadow-2xl p-3 w-[230px] rotate-1">
-            <p className="text-[12px] font-semibold text-[#1F2D3D] leading-snug line-clamp-2">
-              {activeTask.title}
-            </p>
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+        <DragOverlay dropAnimation={{ duration: 180, easing: 'ease-out' }}>
+          {activeTask ? (
+            <div className="bg-white rounded-xl border border-[#0073EA] shadow-2xl p-3 w-[230px] rotate-1">
+              <p className="text-[12px] font-semibold text-[#1F2D3D] leading-snug line-clamp-2">
+                {activeTask.title}
+              </p>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      <AnimatePresence>
+        {pendingMove && (
+          <ConfirmMoveModal
+            move={pendingMove}
+            onConfirm={confirmMove}
+            onCancel={cancelMove}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }

@@ -123,41 +123,21 @@ export function ProjectCard({ project }: { project: Project; key?: React.Key }) 
   );
 }
 
-export function DailyBrief({ projects, tasks }: { projects: Project[]; tasks: Task[] }) {
-  const { t, isRTL } = useI18n();
+export function DailyBrief({ projects: _projects, tasks: _tasks }: { projects: Project[]; tasks: Task[] }) {
+  const { t, isRTL, language } = useI18n();
   const [brief, setBrief] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function generateBrief() {
     setLoading(true);
-    setTimeout(() => {
-      const blockedProject = projects.find(p => p.status === 'Blocked');
-      const criticalCount = tasks.filter(t => t.priority === 'Critical' || t.isBlocked).length;
-      const atRisk = projects.filter(p => p.status === 'At Risk').length;
-
-      let summary = '';
-      if (isRTL) {
-        if (blockedProject) {
-          summary = `${blockedProject.name} חסום כרגע ודורש טיפול מיידי. `;
-        } else if (atRisk > 0) {
-          summary = `${atRisk} פרויקטים בסיכון דורשים תשומת לב. `;
-        } else {
-          summary = 'הפורטפוליו יציב ואין חסמים פעילים. ';
-        }
-        summary += `${criticalCount} פריטים קריטיים זוהו.`;
-      } else {
-        if (blockedProject) {
-          summary = `${blockedProject.name} is currently blocked and needs immediate attention. `;
-        } else if (atRisk > 0) {
-          summary = `${atRisk} at-risk projects require your focus. `;
-        } else {
-          summary = 'Portfolio is stable with no active blockers. ';
-        }
-        summary += `${criticalCount} critical items identified.`;
-      }
-      setBrief(summary);
+    try {
+      const data = await api.ai.dailyBrief(language);
+      setBrief(data.brief);
+    } catch {
+      setBrief(isRTL ? 'לא ניתן לייצר את התדרוך כרגע. נסה שוב.' : 'Could not generate brief. Please try again.');
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   }
 
   return (

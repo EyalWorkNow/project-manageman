@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft2, Magicpen, Add, Warning2, Eye, Edit2,
-  Profile2User, FolderOpen, Send2, DocumentText, MessageText, Flash,
+  Profile2User, FolderOpen, Send2, DocumentText, MessageText, Flash, ClipboardText, TickCircle,
 } from 'iconsax-react';
 import { motion } from 'motion/react';
-import { Project, Task, AISummary, ProjectGanttData, ProjectMember, ProjectDecisionItem, STATUS_TRANSLATION_KEYS } from '../types';
+import { Project, Task, AISummary, ProjectGanttData, ProjectMember, ProjectDecisionItem, ChatMessage, STATUS_TRANSLATION_KEYS } from '../types';
 import { api } from '../services/api';
 import { cn, formatDate, daysUntil, STATUS_COLORS, PRIORITY_COLORS, STATUS_DOT, PRIORITY_DOT } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
@@ -29,6 +29,77 @@ function Section({ label, content, accent }: { label: string; content: string; a
       <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{label}</p>
       <p className={cn('text-xs leading-relaxed font-semibold', accent ? 'text-zinc-900' : 'text-zinc-900')}>{content}</p>
     </div>
+  );
+}
+
+function parseInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*\n]+\*\*|__[^_\n]+__)/g);
+  return parts.map((part, i) => {
+    if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+      return <strong key={i} className="font-semibold text-zinc-900">{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
+function MarkdownText({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+  let listType: 'ul' | 'ol' | null = null;
+
+  function flushList() {
+    if (!listItems.length) return;
+    const items = listItems.map((item, i) => <li key={i}>{parseInline(item)}</li>);
+    elements.push(
+      listType === 'ol'
+        ? <ol key={elements.length} className="list-decimal pl-5 space-y-0.5 my-1">{items}</ol>
+        : <ul key={elements.length} className="list-disc pl-5 space-y-0.5 my-1">{items}</ul>
+    );
+    listItems = [];
+    listType = null;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const ul = line.match(/^[-*•]\s+(.*)/);
+    const ol = line.match(/^\d+\.\s+(.*)/);
+    const h = line.match(/^#{1,3}\s+(.*)/);
+
+    if (ul) {
+      if (listType !== 'ul') flushList();
+      listType = 'ul'; listItems.push(ul[1]);
+    } else if (ol) {
+      if (listType !== 'ol') flushList();
+      listType = 'ol'; listItems.push(ol[1]);
+    } else {
+      flushList();
+      if (h) {
+        elements.push(<p key={elements.length} className="font-bold text-sm text-zinc-900 mt-2 mb-0.5">{parseInline(h[1])}</p>);
+      } else if (!line.trim()) {
+        if (i > 0 && i < lines.length - 1) elements.push(<div key={elements.length} className="h-1.5" />);
+      } else {
+        elements.push(<p key={elements.length} className="leading-relaxed">{parseInline(line)}</p>);
+      }
+    }
+  }
+  flushList();
+  return <div className="text-sm space-y-0.5">{elements}</div>;
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      className="w-6 h-6 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer flex-shrink-0"
+      title="Copy"
+    >
+      {copied
+        ? <TickCircle size={12} color="#22c55e" variant="Bold" />
+        : <ClipboardText size={12} color="currentColor" variant="Linear" />
+      }
+    </button>
   );
 }
 
@@ -64,6 +135,7 @@ export default function ProjectDetails() {
   const [chatInput, setChatInput] = useState('');
   const [generatingAI, setGeneratingAI] = useState(false);
   const chatEndRef = React.useRef<HTMLDivElement>(null);
+  const aiAbortRef = useRef<AbortController | null>(null);
 
   function refreshGanttData(projectId = id) {
     if (!projectId) return;
@@ -243,55 +315,96 @@ export default function ProjectDetails() {
     } finally { setGeneratingAI(false); }
   }
 
+  async function streamProjectChat(userText: string, historySnapshot: ChatMessage[]) {
+    if (!project) return;
+    const assistantId = crypto.randomUUID();
+    setAiMessages(prev => [...prev, {
+      id: assistantId, role: 'assistant', content: '', type: 'text', timestamp: new Date(), data: { streaming: true },
+    }]);
+    setGeneratingAI(true);
+    aiAbortRef.current = new AbortController();
+
+    try {
+      const response = await fetch('/api/ai/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userText, history: historySnapshot, language, projectId: project.id }),
+        signal: aiAbortRef.current.signal,
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let full = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.text) {
+              full += parsed.text;
+              const snapshot = full;
+              setAiMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, content: snapshot } : m
+              ));
+            }
+          } catch { /* skip */ }
+        }
+      }
+      setAiMessages(prev => prev.map(m => m.id === assistantId ? { ...m, data: undefined } : m));
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        // Fallback to non-streaming
+        try {
+          const data = await api.ai.chat(userText, historySnapshot, language, project.id);
+          setAiMessages(prev => prev.map(m =>
+            m.id === assistantId ? { ...m, content: data.reply || 'No response.', data: undefined } : m
+          ));
+        } catch {
+          setAiMessages(prev => prev.map(m =>
+            m.id === assistantId
+              ? { ...m, content: isRTL ? 'אירעה שגיאה. נסה שנית.' : 'Error occurred. Please try again.', data: undefined }
+              : m
+          ));
+        }
+      } else {
+        setAiMessages(prev => prev.map(m =>
+          m.id === assistantId ? { ...m, data: undefined } : m
+        ));
+      }
+    } finally {
+      setGeneratingAI(false);
+      aiAbortRef.current = null;
+    }
+  }
+
   async function handleSendChat() {
     if (!chatInput.trim() || !project || generatingAI) return;
     const text = chatInput.trim();
     setChatInput('');
+    const history: ChatMessage[] = aiMessages.map(m => ({ role: m.role, content: m.content }));
     const userMsg: ProjectChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, type: 'text', timestamp: new Date() };
     setAiMessages(prev => [...prev, userMsg]);
-    setGeneratingAI(true);
-    try {
-      const data = await api.ai.draft(text, enhancedAiContext, language);
-      const aiMsg: ProjectChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: data.reply || 'No response.', type: 'text', timestamp: new Date() };
-      setAiMessages(prev => [...prev, aiMsg]);
-    } catch {
-      setAiMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: isRTL ? 'אירעה שגיאה. נסה שנית.' : 'Error occurred. Please try again.', type: 'text', timestamp: new Date() }]);
-    } finally { setGeneratingAI(false); }
+    await streamProjectChat(text, history);
   }
 
   async function runPresetAiAction(label: string, prompt: string) {
     if (!project || generatingAI) return;
-    const userMsg: ProjectChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: label,
-      type: 'text',
-      timestamp: new Date(),
-    };
     setActiveTab('ai');
+    const history: ChatMessage[] = aiMessages.map(m => ({ role: m.role, content: m.content }));
+    const userMsg: ProjectChatMessage = { id: crypto.randomUUID(), role: 'user', content: label, type: 'text', timestamp: new Date() };
     setAiMessages(prev => [...prev, userMsg]);
-    setGeneratingAI(true);
-    try {
-      const data = await api.ai.draft(prompt, enhancedAiContext, language);
-      const aiMsg: ProjectChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: data.reply || 'No response.',
-        type: 'text',
-        timestamp: new Date(),
-      };
-      setAiMessages(prev => [...prev, aiMsg]);
-    } catch {
-      setAiMessages(prev => [...prev, {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: isRTL ? 'אירעה שגיאה. נסה שנית.' : 'Error occurred. Please try again.',
-        type: 'text',
-        timestamp: new Date(),
-      }]);
-    } finally {
-      setGeneratingAI(false);
-    }
+    await streamProjectChat(prompt, history);
   }
   
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -746,11 +859,19 @@ export default function ProjectDetails() {
                             {/* Assistant generic text */}
                             {msg.role === 'assistant' && msg.type === 'text' && (
                               <div className={cn(
-                                "inline-block px-4 py-3 rounded-2xl text-sm leading-relaxed",
-                                "bg-zinc-50 border border-zinc-200 text-zinc-800 shadow-sm whitespace-pre-wrap",
+                                "px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-800 shadow-sm",
                                 isRTL ? "rounded-tr-sm text-right" : "rounded-tl-sm text-left"
                               )}>
-                                {msg.content}
+                                {msg.content
+                                  ? <MarkdownText content={msg.content} />
+                                  : null}
+                                {msg.data?.streaming && (
+                                  <span className="inline-flex gap-1 mt-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.2s]" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.1s]" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" />
+                                  </span>
+                                )}
                               </div>
                             )}
 
@@ -793,21 +914,26 @@ export default function ProjectDetails() {
                               </div>
                             )}
 
-                            <div className={cn("text-[10px] text-zinc-400 mt-1.5 px-1", isRTL ? (msg.role === 'user' ? 'text-left' : 'text-right') : (msg.role === 'user' ? 'text-right' : 'text-left'))}>
-                              {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            <div className={cn("flex items-center gap-2 mt-1.5 px-1", isRTL ? (msg.role === 'user' ? 'justify-end' : 'justify-start flex-row-reverse') : (msg.role === 'user' ? 'justify-end flex-row-reverse' : 'justify-start'))}>
+                              <span className="text-[10px] text-zinc-400">
+                                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {msg.role === 'assistant' && msg.content && !msg.data?.streaming && (
+                                <CopyButton text={msg.content} />
+                              )}
                             </div>
                           </div>
                         </div>
                       ))
                     )}
                     
-                    {/* Typing Indicator */}
-                    {generatingAI && (
+                    {/* Typing indicator — only while awaiting first token */}
+                    {generatingAI && !aiMessages.some(m => m.data?.streaming) && (
                       <div className={cn('flex w-full', isRTL ? 'justify-end' : 'justify-start')}>
                         <div className="bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-2xl shadow-sm flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-2 h-2 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-2 h-2 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                          <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
                       </div>
                     )}

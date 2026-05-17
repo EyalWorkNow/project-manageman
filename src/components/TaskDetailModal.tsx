@@ -38,6 +38,8 @@ export default function TaskDetailModal({ task, onClose, onUpdate, onDelete, cur
   const { t, isRTL, language } = useI18n();
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Task>>({});
+  const [statusPickerOpen, setStatusPickerOpen] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [taskContext, setTaskContext] = useState<TaskDetailContext>({ dependencies: [], activity: [] });
   const [commentInput, setCommentInput] = useState('');
@@ -151,6 +153,18 @@ export default function TaskDetailModal({ task, onClose, onUpdate, onDelete, cur
     onClose();
   }
 
+  async function quickChangeStatus(newStatus: typeof TASK_STATUSES[number]) {
+    if (!task || changingStatus || newStatus === task.status) { setStatusPickerOpen(false); return; }
+    setChangingStatus(true);
+    setStatusPickerOpen(false);
+    try {
+      const updated = await api.tasks.save({ ...task, status: newStatus });
+      onUpdate(updated);
+      setEditData(d => ({ ...d, status: newStatus }));
+    } catch { /* keep old status on error */ }
+    finally { setChangingStatus(false); }
+  }
+
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(); }
   }
@@ -227,9 +241,58 @@ export default function TaskDetailModal({ task, onClose, onUpdate, onDelete, cur
               <button onClick={onClose} className="text-[#6B7A8D] hover:text-[#1F2D3D] transition-colors cursor-pointer">
                 <ArrowLeft2 size={20} color="currentColor" className={isRTL ? 'rotate-180' : ''} />
               </button>
-              <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full border', STATUS_COLORS[task.status])}>
-                {t(STATUS_TRANSLATION_KEYS[task.status])}
-              </span>
+
+              {/* Quick status picker */}
+              <div className="relative">
+                <button
+                  onClick={() => !editing && setStatusPickerOpen(p => !p)}
+                  disabled={editing || changingStatus}
+                  className={cn(
+                    'text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all',
+                    STATUS_COLORS[task.status],
+                    !editing && 'hover:opacity-80 cursor-pointer',
+                    editing && 'cursor-default',
+                    changingStatus && 'opacity-60',
+                  )}
+                  title={editing ? undefined : (isRTL ? 'שנה סטטוס' : 'Change status')}
+                >
+                  {changingStatus ? '...' : t(STATUS_TRANSLATION_KEYS[task.status])}
+                </button>
+
+                <AnimatePresence>
+                  {statusPickerOpen && (
+                    <>
+                      <div className="fixed inset-0 z-[60]" onClick={() => setStatusPickerOpen(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                        transition={{ duration: 0.12 }}
+                        className={cn(
+                          'absolute top-full mt-1.5 z-[61] bg-white border border-[#E6E9EF] rounded-xl shadow-lg overflow-hidden min-w-[160px]',
+                          isRTL ? 'right-0' : 'left-0',
+                        )}
+                      >
+                        {TASK_STATUSES.map(s => (
+                          <button
+                            key={s}
+                            onClick={() => quickChangeStatus(s)}
+                            className={cn(
+                              'w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-[#1F2D3D] hover:bg-[#F6F7FB] transition-colors cursor-pointer',
+                              isRTL && 'flex-row-reverse text-right',
+                              s === task.status && 'bg-[#F0F2F7]',
+                            )}
+                          >
+                            <span className={cn('w-2 h-2 rounded-full flex-shrink-0', STATUS_DOT[s])} />
+                            {t(STATUS_TRANSLATION_KEYS[s])}
+                          </button>
+                        ))}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+
               <div className={cn('w-2 h-2 rounded-full', PRIORITY_DOT[task.priority])} />
               <span className={cn('text-[11px] font-bold', PRIORITY_COLORS[task.priority])}>
                 {t(PRIORITY_TRANSLATION_KEYS[task.priority])}

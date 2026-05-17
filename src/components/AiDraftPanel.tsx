@@ -56,7 +56,8 @@ export default function AiDraftPanel({ context }: AiDraftPanelProps) {
       <button
         onClick={() => setOpen(o => !o)}
         className={cn(
-          'fixed bottom-6 right-6 z-50 w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center transition-all cursor-pointer',
+          'fixed bottom-6 z-50 w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center transition-all cursor-pointer',
+          isRTL ? 'left-6' : 'right-6',
           open ? 'bg-[#1F2D3D] rotate-12' : 'bg-[#0073EA] hover:bg-[#0060C2]'
         )}
         title={isRTL ? 'עוזר AI לניסוח' : 'AI Draft Assistant'}
