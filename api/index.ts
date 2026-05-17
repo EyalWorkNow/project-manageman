@@ -1,4 +1,4 @@
-import app from "../server";
+import app from "../server.js";
 
 import type { IncomingMessage, ServerResponse } from "http";
 
