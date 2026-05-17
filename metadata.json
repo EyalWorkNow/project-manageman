@@ -1,0 +1,6 @@
+{
+  "name": "SyncPro PM Task MVP",
+  "description": "A working task management MVP for project managers tracking enterprise client projects, blockers, and customer-safe status updates.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
