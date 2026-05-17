@@ -1320,26 +1320,53 @@ app.post("/api/ai/chat", async (req, res) => {
 
   const responseLanguage: ResponseLanguage = language === "he" ? "he" : "en";
 
+  const allProjects = await getProjects();
+  const allTasks = await getTasks();
+
+  const projectsSummary = allProjects.map(p => ({
+    id: p.id,
+    name: p.name,
+    status: p.status,
+    manager: p.projectManager
+  }));
+
+  const filteredTasks = allTasks
+    .filter(t => t.isBlocked || t.priority === "Critical" || t.status === "In Progress")
+    .slice(0, 150)
+    .map(t => ({
+      id: t.id,
+      projectId: t.projectId,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      isBlocked: t.isBlocked,
+      blockerDescription: t.blockerDescription,
+      assignee: t.assignee
+    }));
+
   const contextData = {
-    projects: (await getProjects()),
-    tasks: (await getTasks()),
+    projects: projectsSummary,
+    tasks: filteredTasks,
     summary: {
-      totalProjects: (await getProjects()).length,
-      totalTasks: (await getTasks()).length,
-      blockedTasks: (await getTasks()).filter((t) => t.isBlocked).length,
+      totalProjects: allProjects.length,
+      totalTasks: allTasks.length,
+      blockedTasks: allTasks.filter((t) => t.isBlocked).length,
       projectsByStatus: {
-        onTrack: (await getProjects()).filter((p) => p.status === "On Track").length,
-        atRisk: (await getProjects()).filter((p) => p.status === "At Risk").length,
-        blocked: (await getProjects()).filter((p) => p.status === "Blocked").length,
-        completed: (await getProjects()).filter((p) => p.status === "Completed").length,
+        onTrack: allProjects.filter((p) => p.status === "On Track").length,
+        atRisk: allProjects.filter((p) => p.status === "At Risk").length,
+        blocked: allProjects.filter((p) => p.status === "Blocked").length,
+        completed: allProjects.filter((p) => p.status === "Completed").length,
       },
       tasksByStatus: {
-        todo: (await getTasks()).filter((t) => t.status === "To Do").length,
-        inProgress: (await getTasks()).filter((t) => t.status === "In Progress").length,
-        waitingForClient: (await getTasks()).filter((t) => t.status === "Waiting for Client").length,
-        done: (await getTasks()).filter((t) => t.status === "Done").length,
+        todo: allTasks.filter((t) => t.status === "To Do").length,
+        inProgress: allTasks.filter((t) => t.status === "In Progress").length,
+        waitingForClient: allTasks.filter((t) => t.status === "Waiting for Client").length,
+        done: allTasks.filter((t) => t.status === "Done").length,
       },
-      criticalTasks: (await getTasks()).filter((t) => t.priority === "Critical" && t.status !== "Done"),
+      criticalTasks: allTasks
+        .filter((t) => t.priority === "Critical" && t.status !== "Done")
+        .slice(0, 50)
+        .map(t => ({ id: t.id, title: t.title, projectId: t.projectId })),
     },
   };
 

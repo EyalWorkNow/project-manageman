@@ -189,7 +189,20 @@ export default function ProjectDetails() {
     : days < 0   ? `${Math.abs(days)}${isRTL ? ' ד׳ באיחור' : 'd overdue'}`
     :              `${days}${isRTL ? ' ד׳ נותרו' : 'd left'}`;
 
-  const aiContext = `Project: ${project.name}. Client: ${project.clientName}. Status: ${project.status}. Tasks: ${tasks.map(t => `${t.title} [${t.status}]`).join(', ')}.`;
+  const enhancedAiContext = [
+    `Project: ${project.name}`,
+    `Client: ${project.clientName}`,
+    `Project status: ${project.status}`,
+    `Progress: ${progress}%`,
+    `Active tasks: ${activeTasks}`,
+    `Blocked tasks: ${blockedTasks.length}`,
+    `Completed tasks: ${completedTasks}`,
+    blockedTasks.length > 0 ? `Blocked task details: ${blockedTasks.map(task => `${task.title} (${task.blockerDescription || 'No blocker description'})`).join('; ')}` : '',
+    ganttData?.health ? `Critical path tasks: ${ganttData.health.criticalPathTasks}. Overdue tasks: ${ganttData.health.overdueTasks}.` : '',
+    ganttData?.milestones?.length ? `Milestones: ${ganttData.milestones.map((milestone) => `${milestone.milestoneName} [${milestone.status}] due ${milestone.dueDate}`).join('; ')}` : '',
+    ganttData?.resources?.length ? `Resource load: ${ganttData.resources.slice(0, 6).map((resource) => `${resource.fullName} ${Math.round(resource.openTaskAllocationPercent || 0)}% allocation across ${resource.openTasks} open tasks`).join('; ')}` : '',
+    `Tasks: ${tasks.map(t => `${t.title} [${t.status}]`).join(', ')}`,
+  ].filter(Boolean).join('. ');
 
   // ── AI handlers ─────────────────────────────────────────────────────────────
   async function generateAISummary() {
@@ -228,17 +241,47 @@ export default function ProjectDetails() {
     setAiMessages(prev => [...prev, userMsg]);
     setGeneratingAI(true);
     try {
-      const res = await fetch('/api/ai/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, context: aiContext, language }),
-      });
-      const data = await res.json();
+      const data = await api.ai.draft(text, enhancedAiContext, language);
       const aiMsg: ProjectChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: data.reply || 'No response.', type: 'text', timestamp: new Date() };
       setAiMessages(prev => [...prev, aiMsg]);
     } catch {
       setAiMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: isRTL ? 'אירעה שגיאה. נסה שנית.' : 'Error occurred. Please try again.', type: 'text', timestamp: new Date() }]);
     } finally { setGeneratingAI(false); }
+  }
+
+  async function runPresetAiAction(label: string, prompt: string) {
+    if (!project || generatingAI) return;
+    const userMsg: ProjectChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: label,
+      type: 'text',
+      timestamp: new Date(),
+    };
+    setActiveTab('ai');
+    setAiMessages(prev => [...prev, userMsg]);
+    setGeneratingAI(true);
+    try {
+      const data = await api.ai.draft(prompt, enhancedAiContext, language);
+      const aiMsg: ProjectChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.reply || 'No response.',
+        type: 'text',
+        timestamp: new Date(),
+      };
+      setAiMessages(prev => [...prev, aiMsg]);
+    } catch {
+      setAiMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: isRTL ? 'אירעה שגיאה. נסה שנית.' : 'Error occurred. Please try again.',
+        type: 'text',
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setGeneratingAI(false);
+    }
   }
   
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -394,6 +437,17 @@ export default function ProjectDetails() {
               </span>
             </div>
             <div className={cn('flex flex-wrap gap-2', isRTL && 'flex-row-reverse')}>
+              <button
+                onClick={() => runPresetAiAction(
+                  isRTL ? 'תוכנית שחרור חסמים' : 'Blocker Recovery Plan',
+                  isRTL
+                    ? 'נתח את החסמים הפעילים, תעדף אותם, תן תוכנית שחרור אופרטיבית, מי צריך לטפל, ומה צריך לעדכן ללקוח או להנהלה.'
+                    : 'Analyze the active blockers, prioritize them, and produce an operational recovery plan with owners, next actions, and any stakeholder follow-up needed.',
+                )}
+                className="text-[11px] font-semibold bg-white border border-[#F5C0CA] text-[#C5263A] rounded-full px-2.5 py-0.5 hover:bg-[#FFEEF1] transition-colors cursor-pointer"
+              >
+                {isRTL ? 'AI לשחרור חסמים' : 'AI Recovery Plan'}
+              </button>
               {blockedTasks.map(task => (
                 <button
                   key={task.id}
@@ -514,6 +568,40 @@ export default function ProjectDetails() {
                     >
                       <MessageText size={18} className="text-indigo-500 flex-shrink-0" variant="Bold" />
                       <span>{isRTL ? 'טיוטת עדכון לקוח' : 'Customer Update Draft'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => runPresetAiAction(
+                        isRTL ? 'תדרוך שבועי למנהל פרויקט' : 'Weekly PM Brief',
+                        isRTL
+                          ? 'כתוב תדרוך שבועי קצר למנהל פרויקט: שלושה סיכונים מיידיים, שלוש החלטות שצריך לקבל השבוע, ושלוש משימות שחייבות לזוז עכשיו.'
+                          : 'Create a concise weekly PM brief with three immediate risks, three decisions needed this week, and three tasks that must move now.',
+                      )}
+                      disabled={generatingAI}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200/60 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-sm font-semibold text-zinc-700 hover:text-emerald-700 disabled:opacity-50",
+                        isRTL && "flex-row-reverse text-right"
+                      )}
+                    >
+                      <Flash size={18} className="text-emerald-500 flex-shrink-0" variant="Bold" />
+                      <span>{isRTL ? 'תדרוך שבועי PM' : 'Weekly PM Brief'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => runPresetAiAction(
+                        isRTL ? 'איזון עומס משאבים' : 'Resource Rebalance',
+                        isRTL
+                          ? 'נתח את עומס המשאבים בפרויקט ותן המלצות פרקטיות לאיזון עומסים, שינוי בעלים או סדר עדיפויות מחדש בלי לסכן את היעד.'
+                          : 'Analyze resource load in this project and suggest practical rebalancing actions, owner changes, or reprioritization without putting the target date at risk.',
+                      )}
+                      disabled={generatingAI}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200/60 hover:border-violet-300 hover:bg-violet-50 transition-all text-sm font-semibold text-zinc-700 hover:text-violet-700 disabled:opacity-50",
+                        isRTL && "flex-row-reverse text-right"
+                      )}
+                    >
+                      <Profile2User size={18} className="text-violet-500 flex-shrink-0" variant="Bold" />
+                      <span>{isRTL ? 'איזון עומסים' : 'Resource Rebalance'}</span>
                     </button>
                   </div>
                   
@@ -697,7 +785,7 @@ export default function ProjectDetails() {
       />
 
       {/* ── FLOATING AI DRAFT PANEL ───────────────────────────────────────── */}
-      <AiDraftPanel context={aiContext} />
+      <AiDraftPanel context={enhancedAiContext} />
     </div>
   );
 }
