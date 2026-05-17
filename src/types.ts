@@ -31,6 +31,8 @@ export interface ProjectMember {
   email: string;
   title: string;
   createdAt: string;
+  projectRole?: string;
+  allocationPercent?: number;
 }
 
 export interface Comment {
@@ -70,6 +72,14 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   comments?: Comment[];
+  startDate?: string;
+  progressPercent?: number;
+  sortOrder?: number;
+  timelineHealth?: string;
+  isCriticalPath?: boolean;
+  taskType?: string;
+  baselineStartDate?: string;
+  baselineEndDate?: string;
 }
 
 export interface AISummary {
@@ -89,7 +99,100 @@ export interface CustomerUpdateResponse {
 export interface SystemStatus {
   aiMode: 'gemini' | 'local-fallback';
   geminiModel: string;
-  storage: 'local-json';
+  storage: 'local-json' | 'postgres';
   persistence: boolean;
   generatedAt: string;
+}
+
+export interface GanttProjectHealth {
+  projectId: string;
+  projectKey: string;
+  projectName: string;
+  status: string;
+  priority: string;
+  startDate: string;
+  targetEndDate: string;
+  actualEndDate: string | null;
+  progressPercent: number;
+  totalTasks: number;
+  completedTasks: number;
+  blockedTasks: number;
+  overdueTasks: number;
+  criticalPathTasks: number;
+  earliestTaskStart: string | null;
+  latestTaskEnd: string | null;
+  healthStatus: string;
+}
+
+export interface GanttTimelineTask {
+  taskId: string;
+  projectId: string;
+  taskKey: string;
+  title: string;
+  taskType: string;
+  taskStatus: string;
+  priority: string;
+  plannedStartDate: string;
+  plannedEndDate: string;
+  actualStartDate: string | null;
+  actualEndDate: string | null;
+  durationDays: number;
+  progressPercent: number;
+  estimatedHours: number | null;
+  loggedHours: number;
+  isCriticalPath: boolean;
+  sortOrder: number;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  blockingDependenciesCount: number;
+  dependentTasksCount: number;
+  isOverdue: boolean;
+  timelineHealth: string;
+  assignees: string[];
+  baselineName: string | null;
+  baselineVersion: number | null;
+  baselineStartDate: string | null;
+  baselineEndDate: string | null;
+  commentsCount: number;
+}
+
+export interface GanttMilestone {
+  id: string;
+  projectId: string;
+  milestoneKey: string;
+  milestoneName: string;
+  dueDate: string;
+  status: string;
+  completedAt: string | null;
+  ownerName: string | null;
+  isLate: boolean;
+}
+
+export interface GanttResourceLoad {
+  userId: string;
+  fullName: string;
+  department: string | null;
+  activeProjects: number;
+  openTasks: number;
+  openTaskAllocationPercent: number | null;
+  nextTaskStart: string | null;
+  latestTaskEnd: string | null;
+}
+
+export interface GanttActivityItem {
+  id: string;
+  taskId: string | null;
+  taskTitle: string | null;
+  actorName: string | null;
+  eventType: string;
+  message: string | null;
+  createdAt: string;
+}
+
+export interface ProjectGanttData {
+  health: GanttProjectHealth;
+  tasks: GanttTimelineTask[];
+  milestones: GanttMilestone[];
+  resources: GanttResourceLoad[];
+  activity: GanttActivityItem[];
 }

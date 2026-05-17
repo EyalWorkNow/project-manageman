@@ -23,32 +23,47 @@ export default function CustomerView() {
   const { t, isRTL, language, setLanguage } = useI18n();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [generatingUpdate, setGeneratingUpdate] = useState(false);
   const [customerUpdate, setCustomerUpdate] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadData() {
       if (!id) return;
       try {
         setLoading(true);
+        setLoadError(null);
         setCustomerUpdate(null);
         const data = await api.projects.get(id);
+        if (cancelled) return;
         setProject(data);
         setLoading(false);
         setGeneratingUpdate(true);
         try {
           const aiUpdate = await api.ai.customerUpdate(data, data.tasks || [], language);
+          if (cancelled) return;
           setCustomerUpdate(aiUpdate.update);
         } finally {
-          setGeneratingUpdate(false);
+          if (!cancelled) {
+            setGeneratingUpdate(false);
+          }
         }
       } catch (err) {
         console.error(err);
-        setLoading(false);
-        setGeneratingUpdate(false);
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : 'Could not load project.');
+          setLoading(false);
+          setGeneratingUpdate(false);
+        }
       }
     }
     loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id, language]);
 
   if (loading) {
@@ -62,7 +77,17 @@ export default function CustomerView() {
     );
   }
 
-  if (!project) return <div>Project not found</div>;
+  if (!project) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#FAFAFA]">
+        <p className="text-sm font-semibold text-zinc-500">
+          {loadError && loadError !== 'Project not found.'
+            ? (isRTL ? 'לא ניתן לטעון את הפרויקט כרגע.' : 'Could not load the project right now.')
+            : (isRTL ? 'פרויקט לא נמצא.' : 'Project not found.')}
+        </p>
+      </div>
+    );
+  }
 
   const tasks = project.tasks || [];
   const completed = tasks.filter(t => t.status === 'Done');

@@ -12,7 +12,13 @@ import {
   TASK_STATUSES,
   type AISummary,
   type Comment,
+  type GanttActivityItem,
+  type GanttMilestone,
+  type GanttProjectHealth,
+  type GanttResourceLoad,
+  type GanttTimelineTask,
   type Project,
+  type ProjectGanttData,
   type ProjectMember,
   type ProjectStatus,
   type Task,
@@ -59,48 +65,578 @@ const pool = new Pool({
   database: "db_proxy_v2"
 });
 
+function toIsoDate(value: Date | string | null | undefined) {
+  if (!value) return "";
+  return new Date(value).toISOString().split("T")[0];
+}
+
+function mapDbProjectStatus(status: string): ProjectStatus {
+  switch (status) {
+    case "completed":
+    case "archived":
+      return "Completed";
+    case "on_hold":
+    case "cancelled":
+      return "Blocked";
+    case "draft":
+      return "At Risk";
+    default:
+      return "On Track";
+  }
+}
+
+function mapUiProjectStatus(status: ProjectStatus) {
+  switch (status) {
+    case "Completed":
+      return "completed";
+    case "Blocked":
+      return "on_hold";
+    case "At Risk":
+      return "planning";
+    default:
+      return "active";
+  }
+}
+
+function mapDbTaskStatus(status: string): TaskStatus {
+  switch (status) {
+    case "done":
+      return "Done";
+    case "blocked":
+      return "Blocked";
+    case "in_review":
+      return "Waiting for Client";
+    case "cancelled":
+      return "Blocked";
+    case "in_progress":
+      return "In Progress";
+    default:
+      return "To Do";
+  }
+}
+
+function mapUiTaskStatus(status: TaskStatus) {
+  switch (status) {
+    case "Done":
+      return "done";
+    case "Blocked":
+      return "blocked";
+    case "Waiting for Client":
+      return "in_review";
+    case "In Progress":
+      return "in_progress";
+    default:
+      return "ready";
+  }
+}
+
+function mapDbPriority(priority: string): TaskPriority {
+  switch (priority) {
+    case "critical":
+      return "Critical";
+    case "high":
+      return "High";
+    case "low":
+      return "Low";
+    default:
+      return "Medium";
+  }
+}
+
+function mapUiPriority(priority: TaskPriority) {
+  switch (priority) {
+    case "Critical":
+      return "critical";
+    case "High":
+      return "high";
+    case "Low":
+      return "low";
+    default:
+      return "medium";
+  }
+}
+
+function taskProgressForStatus(status: TaskStatus, existing?: number) {
+  if (typeof existing === "number" && existing >= 0 && existing <= 100) return existing;
+  switch (status) {
+    case "Done":
+      return 100;
+    case "Waiting for Client":
+      return 75;
+    case "In Progress":
+      return 55;
+    case "Blocked":
+      return 35;
+    default:
+      return 0;
+  }
+}
+
+function slugPrefix(input: string) {
+  const normalized = input.replace(/[^a-z0-9]/gi, "").toUpperCase();
+  return (normalized.slice(0, 4) || "PROJ").padEnd(4, "X");
+}
+
+async function refreshProjectProgress(projectId: string) {
+  await pool.query(
+    `
+      UPDATE work_projects p
+      SET
+        progress_percent = COALESCE((
+          SELECT ROUND(AVG(t.progress_percent), 2)
+          FROM gantt_tasks t
+          WHERE t.project_id = p.id
+        ), 0),
+        consumed_hours = COALESCE((
+          SELECT ROUND(SUM(t.logged_hours), 2)
+          FROM gantt_tasks t
+          WHERE t.project_id = p.id
+        ), 0),
+        updated_at = NOW()
+      WHERE p.id = $1
+    `,
+    [projectId],
+  );
+}
+
+async function getDefaultOrgContext() {
+  const { rows } = await pool.query(
+    `
+      SELECT
+        o.id,
+        o.slug,
+        o.name,
+        (SELECT c.id FROM work_calendars c WHERE c.org_id = o.id ORDER BY c.created_at ASC LIMIT 1) AS calendar_id,
+        (SELECT t.id FROM teams t WHERE t.org_id = o.id ORDER BY t.created_at ASC LIMIT 1) AS team_id,
+        (SELECT u.id FROM users u WHERE u.org_id = o.id AND u.status = 'active' ORDER BY u.created_at ASC LIMIT 1) AS owner_user_id
+      FROM organizations o
+      ORDER BY o.created_at ASC
+      LIMIT 1
+    `,
+  );
+
+  if (rows.length === 0) {
+    throw new Error("No organization data found in the database.");
+  }
+
+  return rows[0] as {
+    id: string;
+    slug: string;
+    name: string;
+    calendar_id: string | null;
+    team_id: string | null;
+    owner_user_id: string | null;
+  };
+}
+
+async function getProjectDbRow(projectId: string) {
+  const { rows } = await pool.query(
+    `
+      SELECT
+        p.*,
+        o.name AS organization_name,
+        o.slug AS organization_slug,
+        owner.full_name AS owner_name
+      FROM work_projects p
+      JOIN organizations o ON o.id = p.org_id
+      LEFT JOIN users owner ON owner.id = p.owner_user_id
+      WHERE p.id = $1
+      LIMIT 1
+    `,
+    [projectId],
+  );
+
+  return rows[0] as
+    | (Record<string, unknown> & {
+        id: string;
+        org_id: string;
+        organization_name: string;
+        organization_slug: string;
+        owner_name: string | null;
+        metadata: Record<string, unknown> | null;
+      })
+    | undefined;
+}
+
+function mapProjectRow(row: Record<string, any>): Project {
+  const metadata = row.metadata || {};
+  return {
+    id: row.id,
+    name: row.name,
+    clientName: readText(metadata.clientName) || row.organization_name,
+    description: row.description || "",
+    status: mapDbProjectStatus(row.status),
+    deadline: toIsoDate(row.target_end_date),
+    projectManager: readText(metadata.projectManager) || row.owner_name || "Unassigned",
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
+function mapTaskRow(row: Record<string, any>): Task {
+  const metadata = row.metadata || {};
+  const assignee =
+    readText(row.assignees) ||
+    readText(metadata.rawAssignee) ||
+    readText(row.owner_name) ||
+    "Unassigned";
+  const blockerDescription =
+    readText(metadata.blockerDescription) ||
+    (row.task_status === "blocked"
+      ? row.blocking_dependencies_count > 0
+        ? "Task is blocked by an upstream dependency."
+        : "Task is currently blocked."
+      : "");
+
+  return {
+    id: row.task_id,
+    projectId: row.project_id,
+    title: row.title,
+    description: row.description || "",
+    assignee,
+    status: mapDbTaskStatus(row.task_status),
+    priority: mapDbPriority(row.priority),
+    dueDate: toIsoDate(row.planned_end_date),
+    isBlocked: row.task_status === "blocked",
+    blockerDescription,
+    internalNotes: readText(metadata.internalNotes),
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    startDate: toIsoDate(row.planned_start_date),
+    progressPercent: Number(row.progress_percent ?? 0),
+    sortOrder: Number(row.sort_order ?? 0),
+    timelineHealth: row.timeline_health || "",
+    isCriticalPath: Boolean(row.is_critical_path),
+    taskType: row.task_type || "task",
+    baselineStartDate: row.baseline_start_date ? toIsoDate(row.baseline_start_date) : undefined,
+    baselineEndDate: row.baseline_end_date ? toIsoDate(row.baseline_end_date) : undefined,
+  };
+}
+
 async function getProjects(): Promise<Project[]> {
-  const result = await pool.query('SELECT * FROM organizations ORDER BY created_at DESC LIMIT 50');
-  return result.rows.map(org => ({
-    id: org.id,
-    name: org.name,
-    clientName: `Plan: ${org.plan}`,
-    description: `Organization running ${org.plan} plan.`,
-    status: org.status === 'active' ? 'On Track' : (org.status === 'suspended' ? 'Blocked' : 'Completed'),
-    deadline: org.created_at.toISOString().split('T')[0],
-    projectManager: 'System',
-    createdAt: org.created_at.toISOString(),
-    updatedAt: org.created_at.toISOString()
-  }));
+  const { rows } = await pool.query(
+    `
+      SELECT
+        p.*,
+        o.name AS organization_name,
+        o.slug AS organization_slug,
+        owner.full_name AS owner_name
+      FROM work_projects p
+      JOIN organizations o ON o.id = p.org_id
+      LEFT JOIN users owner ON owner.id = p.owner_user_id
+      WHERE p.archived_at IS NULL
+      ORDER BY p.updated_at DESC
+      LIMIT 100
+    `,
+  );
+
+  return rows.map(mapProjectRow);
 }
 
 async function getTasks(projectId?: string): Promise<Task[]> {
-  const result = projectId 
-    ? await pool.query('SELECT * FROM support_tickets WHERE organization_id = $1 ORDER BY created_at DESC LIMIT 200', [projectId])
-    : await pool.query('SELECT * FROM support_tickets ORDER BY created_at DESC LIMIT 200');
-  
-  return result.rows.map(t => ({
-    id: t.id,
-    projectId: t.organization_id,
-    title: t.subject,
-    description: `Category: ${t.category}`,
-    assignee: 'Agent',
-    status: t.status === 'open' ? 'To Do' : (t.status === 'waiting_on_engineering' ? 'In Progress' : (t.status === 'waiting_on_customer' ? 'Waiting for Client' : (t.status === 'closed' ? 'Blocked' : 'Done'))),
-    priority: t.priority === 'urgent' ? 'Critical' : (t.priority === 'high' ? 'High' : (t.priority === 'normal' ? 'Medium' : 'Low')),
-    dueDate: t.created_at.toISOString().split('T')[0],
-    isBlocked: t.status === 'closed',
-    blockerDescription: '',
-    internalNotes: '',
-    createdAt: t.created_at.toISOString(),
-    updatedAt: t.created_at.toISOString()
+  const params: string[] = [];
+  const where = projectId ? `WHERE v.project_id = $1` : "";
+  if (projectId) params.push(projectId);
+
+  const { rows } = await pool.query(
+    `
+      SELECT
+        v.*,
+        t.description,
+        t.metadata,
+        t.created_at,
+        t.updated_at,
+        assignees.assignees,
+        baseline.baseline_name,
+        baseline.baseline_version,
+        baseline.baseline_start_date,
+        baseline.baseline_end_date
+      FROM v_gantt_tasks v
+      JOIN gantt_tasks t ON t.id = v.task_id
+      LEFT JOIN LATERAL (
+        SELECT STRING_AGG(DISTINCT u.full_name, ', ' ORDER BY u.full_name) AS assignees
+        FROM gantt_task_assignments a
+        JOIN users u ON u.id = a.user_id
+        WHERE a.task_id = v.task_id
+          AND a.unassigned_at IS NULL
+      ) assignees ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          b.baseline_name,
+          b.baseline_version,
+          b.planned_start_date AS baseline_start_date,
+          b.planned_end_date AS baseline_end_date
+        FROM gantt_task_baselines b
+        WHERE b.task_id = v.task_id
+        ORDER BY b.baseline_version DESC
+        LIMIT 1
+      ) baseline ON TRUE
+      ${where}
+      ORDER BY v.sort_order ASC, t.created_at ASC
+    `,
+    params,
+  );
+
+  return rows.map(mapTaskRow);
+}
+
+async function getProjectMembers(projectId: string): Promise<ProjectMember[]> {
+  const { rows } = await pool.query(
+    `
+      SELECT
+        u.id,
+        pm.project_id,
+        u.full_name,
+        u.email,
+        u.title,
+        pm.project_role,
+        pm.allocation_percent,
+        pm.joined_at
+      FROM project_members pm
+      JOIN users u ON u.id = pm.user_id
+      WHERE pm.project_id = $1
+        AND pm.left_at IS NULL
+      ORDER BY
+        CASE pm.project_role
+          WHEN 'owner' THEN 0
+          WHEN 'lead' THEN 1
+          WHEN 'contributor' THEN 2
+          ELSE 3
+        END,
+        u.full_name ASC
+    `,
+    [projectId],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    projectId: row.project_id,
+    name: row.full_name,
+    email: row.email,
+    title: row.title || row.project_role,
+    createdAt: new Date(row.joined_at).toISOString(),
+    projectRole: row.project_role,
+    allocationPercent: Number(row.allocation_percent ?? 0),
   }));
 }
 
+async function getProjectGantt(projectId: string): Promise<ProjectGanttData | null> {
+  const { rows: healthRows } = await pool.query(
+    `
+      SELECT
+        project_id,
+        project_key,
+        project_name,
+        status,
+        priority,
+        start_date,
+        target_end_date,
+        actual_end_date,
+        progress_percent,
+        total_tasks,
+        completed_tasks,
+        blocked_tasks,
+        overdue_tasks,
+        critical_path_tasks,
+        earliest_task_start,
+        latest_task_end,
+        health_status
+      FROM v_project_timeline_health
+      WHERE project_id = $1
+      LIMIT 1
+    `,
+    [projectId],
+  );
 
-function dateInDays(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().split("T")[0];
+  if (healthRows.length === 0) return null;
+
+  const [tasks, milestoneResult, resourceResult, activityResult] = await Promise.all([
+    pool.query(
+      `
+        SELECT
+          v.*,
+          COALESCE(assignees.assignees, ARRAY[]::TEXT[]) AS assignees,
+          baseline.baseline_name,
+          baseline.baseline_version,
+          baseline.baseline_start_date,
+          baseline.baseline_end_date,
+          COALESCE(comment_counts.comments_count, 0) AS comments_count
+        FROM v_gantt_tasks v
+        LEFT JOIN LATERAL (
+          SELECT ARRAY_AGG(u.full_name ORDER BY u.full_name) AS assignees
+          FROM gantt_task_assignments a
+          JOIN users u ON u.id = a.user_id
+          WHERE a.task_id = v.task_id
+            AND a.unassigned_at IS NULL
+        ) assignees ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT
+            b.baseline_name,
+            b.baseline_version,
+            b.planned_start_date AS baseline_start_date,
+            b.planned_end_date AS baseline_end_date
+          FROM gantt_task_baselines b
+          WHERE b.task_id = v.task_id
+          ORDER BY b.baseline_version DESC
+          LIMIT 1
+        ) baseline ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::INT AS comments_count
+          FROM gantt_task_comments c
+          WHERE c.task_id = v.task_id
+            AND c.deleted_at IS NULL
+        ) comment_counts ON TRUE
+        WHERE v.project_id = $1
+        ORDER BY v.sort_order ASC
+      `,
+      [projectId],
+    ),
+    pool.query(
+      `
+        SELECT
+          m.id,
+          m.project_id,
+          m.milestone_key,
+          m.name AS milestone_name,
+          m.due_date,
+          m.status,
+          m.completed_at,
+          u.full_name AS owner_name,
+          CASE
+            WHEN m.status NOT IN ('completed', 'cancelled') AND m.due_date < CURRENT_DATE THEN TRUE
+            ELSE FALSE
+          END AS is_late
+        FROM gantt_milestones m
+        LEFT JOIN users u ON u.id = m.owner_user_id
+        WHERE m.project_id = $1
+        ORDER BY m.due_date ASC
+      `,
+      [projectId],
+    ),
+    pool.query(
+      `
+        SELECT
+          rl.user_id,
+          rl.full_name,
+          rl.department,
+          rl.active_projects,
+          rl.open_tasks,
+          rl.open_task_allocation_percent,
+          rl.next_task_start,
+          rl.latest_task_end
+        FROM v_gantt_resource_load rl
+        JOIN project_members pm ON pm.user_id = rl.user_id
+        WHERE pm.project_id = $1
+          AND pm.left_at IS NULL
+        ORDER BY COALESCE(rl.open_task_allocation_percent, 0) DESC, rl.full_name ASC
+      `,
+      [projectId],
+    ),
+    pool.query(
+      `
+        SELECT
+          a.id,
+          a.task_id,
+          t.title AS task_title,
+          u.full_name AS actor_name,
+          a.event_type,
+          a.message,
+          a.created_at
+        FROM gantt_task_activity a
+        LEFT JOIN gantt_tasks t ON t.id = a.task_id
+        LEFT JOIN users u ON u.id = a.actor_user_id
+        WHERE a.project_id = $1
+        ORDER BY a.created_at DESC
+        LIMIT 24
+      `,
+      [projectId],
+    ),
+  ]);
+
+  const healthRow = healthRows[0];
+  return {
+    health: {
+      projectId: healthRow.project_id,
+      projectKey: healthRow.project_key,
+      projectName: healthRow.project_name,
+      status: healthRow.status,
+      priority: healthRow.priority,
+      startDate: toIsoDate(healthRow.start_date),
+      targetEndDate: toIsoDate(healthRow.target_end_date),
+      actualEndDate: healthRow.actual_end_date ? toIsoDate(healthRow.actual_end_date) : null,
+      progressPercent: Number(healthRow.progress_percent ?? 0),
+      totalTasks: Number(healthRow.total_tasks ?? 0),
+      completedTasks: Number(healthRow.completed_tasks ?? 0),
+      blockedTasks: Number(healthRow.blocked_tasks ?? 0),
+      overdueTasks: Number(healthRow.overdue_tasks ?? 0),
+      criticalPathTasks: Number(healthRow.critical_path_tasks ?? 0),
+      earliestTaskStart: healthRow.earliest_task_start ? toIsoDate(healthRow.earliest_task_start) : null,
+      latestTaskEnd: healthRow.latest_task_end ? toIsoDate(healthRow.latest_task_end) : null,
+      healthStatus: healthRow.health_status,
+    } satisfies GanttProjectHealth,
+    tasks: tasks.rows.map((row) => ({
+      taskId: row.task_id,
+      projectId: row.project_id,
+      taskKey: row.task_key,
+      title: row.title,
+      taskType: row.task_type,
+      taskStatus: row.task_status,
+      priority: row.priority,
+      plannedStartDate: toIsoDate(row.planned_start_date),
+      plannedEndDate: toIsoDate(row.planned_end_date),
+      actualStartDate: row.actual_start_date ? toIsoDate(row.actual_start_date) : null,
+      actualEndDate: row.actual_end_date ? toIsoDate(row.actual_end_date) : null,
+      durationDays: Number(row.duration_days ?? 1),
+      progressPercent: Number(row.progress_percent ?? 0),
+      estimatedHours: row.estimated_hours === null ? null : Number(row.estimated_hours),
+      loggedHours: Number(row.logged_hours ?? 0),
+      isCriticalPath: Boolean(row.is_critical_path),
+      sortOrder: Number(row.sort_order ?? 0),
+      ownerName: row.owner_name,
+      ownerEmail: row.owner_email,
+      blockingDependenciesCount: Number(row.blocking_dependencies_count ?? 0),
+      dependentTasksCount: Number(row.dependent_tasks_count ?? 0),
+      isOverdue: Boolean(row.is_overdue),
+      timelineHealth: row.timeline_health,
+      assignees: row.assignees || [],
+      baselineName: row.baseline_name,
+      baselineVersion: row.baseline_version === null ? null : Number(row.baseline_version),
+      baselineStartDate: row.baseline_start_date ? toIsoDate(row.baseline_start_date) : null,
+      baselineEndDate: row.baseline_end_date ? toIsoDate(row.baseline_end_date) : null,
+      commentsCount: Number(row.comments_count ?? 0),
+    })) satisfies GanttTimelineTask[],
+    milestones: milestoneResult.rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      milestoneKey: row.milestone_key,
+      milestoneName: row.milestone_name,
+      dueDate: toIsoDate(row.due_date),
+      status: row.status,
+      completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
+      ownerName: row.owner_name,
+      isLate: Boolean(row.is_late),
+    })) satisfies GanttMilestone[],
+    resources: resourceResult.rows.map((row) => ({
+      userId: row.user_id,
+      fullName: row.full_name,
+      department: row.department,
+      activeProjects: Number(row.active_projects ?? 0),
+      openTasks: Number(row.open_tasks ?? 0),
+      openTaskAllocationPercent:
+        row.open_task_allocation_percent === null ? null : Number(row.open_task_allocation_percent),
+      nextTaskStart: row.next_task_start ? toIsoDate(row.next_task_start) : null,
+      latestTaskEnd: row.latest_task_end ? toIsoDate(row.latest_task_end) : null,
+    })) satisfies GanttResourceLoad[],
+    activity: activityResult.rows.map((row) => ({
+      id: row.id,
+      taskId: row.task_id,
+      taskTitle: row.task_title,
+      actorName: row.actor_name,
+      eventType: row.event_type,
+      message: row.message,
+      createdAt: new Date(row.created_at).toISOString(),
+    })) satisfies GanttActivityItem[],
+  };
 }
 
 function nowIso() {
@@ -357,7 +893,7 @@ app.get("/api/system/status", (_req, res) => {
   res.json({
     aiMode: ai ? "gemini" : "local-fallback",
     geminiModel: GEMINI_MODEL,
-    storage: "local-json",
+    storage: "postgres",
     persistence: true,
     generatedAt: nowIso(),
   });
@@ -371,8 +907,44 @@ app.post("/api/projects", async (req, res) => {
   const validation = validateProjectInput(req.body);
   if (validation.ok === false) return res.status(400).json({ error: validation.error, details: validation.details });
   try {
-    await pool.query('INSERT INTO organizations (id, name, plan, status) VALUES ($1, $2, $3, $4)', [validation.value.id, validation.value.name, 'starter', validation.value.status === 'On Track' ? 'active' : 'suspended']);
-    res.status(201).json(validation.value);
+    const org = await getDefaultOrgContext();
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::INT AS count FROM work_projects WHERE org_id = $1`,
+      [org.id],
+    );
+    const sequence = Number(rows[0]?.count ?? 0) + 1;
+    const projectKey = `${slugPrefix(org.slug)}-${String(sequence).padStart(3, "0")}`;
+
+    await pool.query(
+      `
+        INSERT INTO work_projects (
+          id, org_id, team_id, calendar_id, name, project_key, description, status,
+          priority, owner_user_id, start_date, target_end_date, progress_percent,
+          metadata, created_by, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'medium', $9, CURRENT_DATE, $10, 0, $11::jsonb, $9, NOW(), NOW())
+      `,
+      [
+        validation.value.id,
+        org.id,
+        org.team_id,
+        org.calendar_id,
+        validation.value.name,
+        projectKey,
+        validation.value.description,
+        mapUiProjectStatus(validation.value.status),
+        org.owner_user_id,
+        validation.value.deadline,
+        JSON.stringify({
+          clientName: validation.value.clientName,
+          projectManager: validation.value.projectManager,
+          source: "pm_app",
+        }),
+      ],
+    );
+
+    const created = (await getProjects()).find((project) => project.id === validation.value.id);
+    res.status(201).json(created ?? validation.value);
   } catch(e) { res.status(500).json({error: String(e)}); }
 });
 
@@ -381,16 +953,59 @@ app.get("/api/projects/:id", async (req, res) => {
     const projs = await getProjects();
     const project = projs.find(p => p.id === req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found." });
-    res.json({ ...project, tasks: await getTasks(project.id) });
+    const [tasks, members] = await Promise.all([getTasks(project.id), getProjectMembers(project.id)]);
+    res.json({ ...project, tasks, members });
   } catch (e) { res.status(500).json({error: String(e)}); }
+});
+
+app.get("/api/projects/:id/gantt", async (req, res) => {
+  try {
+    const gantt = await getProjectGantt(req.params.id);
+    if (!gantt) return res.status(404).json({ error: "Project not found." });
+    res.json(gantt);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
 });
 
 app.put("/api/projects/:id", async (req, res) => {
   const validation = validateProjectInput(req.body);
   if (validation.ok === false) return res.status(400).json({ error: validation.error, details: validation.details });
   try {
-    await pool.query('UPDATE organizations SET name=$1, status=$2 WHERE id=$3', [validation.value.name, validation.value.status === 'On Track' ? 'active' : 'suspended', req.params.id]);
-    res.json(validation.value);
+    const project = await getProjectDbRow(req.params.id);
+    if (!project) return res.status(404).json({ error: "Project not found." });
+
+    const metadata = {
+      ...(project.metadata || {}),
+      clientName: validation.value.clientName,
+      projectManager: validation.value.projectManager,
+      source: "pm_app",
+    };
+
+    await pool.query(
+      `
+        UPDATE work_projects
+        SET
+          name = $1,
+          description = $2,
+          status = $3,
+          target_end_date = $4,
+          metadata = $5::jsonb,
+          updated_at = NOW()
+        WHERE id = $6
+      `,
+      [
+        validation.value.name,
+        validation.value.description,
+        mapUiProjectStatus(validation.value.status),
+        validation.value.deadline,
+        JSON.stringify(metadata),
+        req.params.id,
+      ],
+    );
+
+    const updated = (await getProjects()).find((item) => item.id === req.params.id);
+    res.json(updated ?? validation.value);
   } catch(e) { res.status(500).json({error: String(e)}); }
 });
 
@@ -405,11 +1020,165 @@ app.post("/api/tasks", async (req, res) => {
   const validation = validateTaskInput(req.body);
   if (validation.ok === false) return res.status(400).json({ error: validation.error, details: validation.details });
   try {
-    const s = validation.value.status;
-    const dbStatus = s === 'To Do' ? 'open' : s === 'In Progress' ? 'waiting_on_engineering' : s === 'Waiting for Client' ? 'waiting_on_customer' : s === 'Blocked' ? 'closed' : 'resolved';
-    const priority = validation.value.priority === 'Critical' ? 'urgent' : validation.value.priority === 'High' ? 'high' : 'normal';
-    await pool.query('INSERT INTO support_tickets (id, organization_id, subject, category, priority, status) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET subject=$3, status=$6', [validation.value.id, validation.value.projectId, validation.value.title, 'question', priority, dbStatus]);
-    res.status(201).json(validation.value);
+    const project = await getProjectDbRow(validation.value.projectId);
+    if (!project) return res.status(404).json({ error: "Project not found." });
+
+    const { rows: existingRows } = await pool.query(
+      `
+        SELECT id, project_id, task_key, sort_order, planned_start_date, progress_percent
+        FROM gantt_tasks
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [validation.value.id],
+    );
+
+    const existing = existingRows[0] as
+      | {
+          id: string;
+          project_id: string;
+          task_key: string;
+          sort_order: number;
+          planned_start_date: Date | string;
+          progress_percent: number;
+        }
+      | undefined;
+
+    const assigneeNames = validation.value.assignee
+      .split(",")
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean);
+
+    const matchedAssignees =
+      assigneeNames.length === 0
+        ? []
+        : (
+            await pool.query(
+              `
+                SELECT DISTINCT u.id, u.full_name
+                FROM project_members pm
+                JOIN users u ON u.id = pm.user_id
+                WHERE pm.project_id = $1
+                  AND pm.left_at IS NULL
+                  AND LOWER(u.full_name) = ANY($2::text[])
+              `,
+              [validation.value.projectId, assigneeNames],
+            )
+          ).rows;
+
+    const taskId = existing?.id || validation.value.id;
+    const sortOrder =
+      existing?.sort_order ??
+      Number(
+        (
+          await pool.query(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort_order FROM gantt_tasks WHERE project_id = $1`, [
+            validation.value.projectId,
+          ])
+        ).rows[0]?.next_sort_order ?? 1,
+      );
+    const taskKey = existing?.task_key || `${String((project as any).project_key)}-T${String(sortOrder).padStart(3, "0")}`;
+    const startDate =
+      validation.value.startDate ||
+      (existing?.planned_start_date ? toIsoDate(existing.planned_start_date) : validation.value.dueDate);
+    const progressPercent = taskProgressForStatus(validation.value.status, validation.value.progressPercent ?? existing?.progress_percent);
+    const metadata = {
+      internalNotes: validation.value.internalNotes,
+      blockerDescription: validation.value.blockerDescription,
+      rawAssignee: validation.value.assignee,
+      source: "pm_app",
+    };
+
+    await pool.query(
+      `
+        INSERT INTO gantt_tasks (
+          id, org_id, project_id, task_key, title, description, task_type, status, priority,
+          planned_start_date, planned_end_date, progress_percent, estimated_hours, logged_hours,
+          owner_user_id, reporter_user_id, sort_order, is_critical_path, is_locked, metadata,
+          created_by, created_at, updated_at, completed_at
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, 'task', $7, $8, $9, $10, $11, 12, 0,
+          $12, $13, $14, FALSE, FALSE, $15::jsonb, $13, NOW(), NOW(),
+          CASE WHEN $7 = 'done' THEN NOW() ELSE NULL END
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          status = EXCLUDED.status,
+          priority = EXCLUDED.priority,
+          planned_start_date = EXCLUDED.planned_start_date,
+          planned_end_date = EXCLUDED.planned_end_date,
+          progress_percent = EXCLUDED.progress_percent,
+          owner_user_id = EXCLUDED.owner_user_id,
+          metadata = EXCLUDED.metadata,
+          updated_at = NOW(),
+          completed_at = CASE WHEN EXCLUDED.status = 'done' THEN NOW() ELSE NULL END
+      `,
+      [
+        taskId,
+        project.org_id,
+        validation.value.projectId,
+        taskKey,
+        validation.value.title,
+        validation.value.description,
+        mapUiTaskStatus(validation.value.status),
+        mapUiPriority(validation.value.priority),
+        startDate,
+        validation.value.dueDate,
+        progressPercent,
+        matchedAssignees[0]?.id ?? null,
+        (project as any).owner_user_id ?? null,
+        sortOrder,
+        JSON.stringify(metadata),
+      ],
+    );
+
+    await pool.query(`DELETE FROM gantt_task_assignments WHERE task_id = $1`, [taskId]);
+
+    for (let index = 0; index < matchedAssignees.length; index += 1) {
+      const assignee = matchedAssignees[index];
+      await pool.query(
+        `
+          INSERT INTO gantt_task_assignments (
+            task_id, user_id, assignment_role, allocation_percent, assigned_by, assigned_at
+          )
+          VALUES ($1, $2, $3, $4, $5, NOW())
+        `,
+        [
+          taskId,
+          assignee.id,
+          index === 0 ? "assignee" : "reviewer",
+          index === 0 ? 100 : 25,
+          matchedAssignees[0]?.id ?? null,
+        ],
+      );
+    }
+
+    await pool.query(
+      `
+        INSERT INTO gantt_task_activity (
+          project_id, org_id, task_id, actor_user_id, event_type, new_value, message, created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, NOW())
+      `,
+      [
+        validation.value.projectId,
+        project.org_id,
+        taskId,
+        matchedAssignees[0]?.id ?? null,
+        existing ? "task_updated" : "task_created",
+        JSON.stringify({
+          status: mapUiTaskStatus(validation.value.status),
+          dueDate: validation.value.dueDate,
+          assignee: validation.value.assignee,
+        }),
+        existing ? "Task updated from PM workspace." : "Task created from PM workspace.",
+      ],
+    );
+
+    await refreshProjectProgress(validation.value.projectId);
+    const savedTask = (await getTasks(validation.value.projectId)).find((task) => task.id === taskId);
+    res.status(existing ? 200 : 201).json(savedTask ?? validation.value);
   } catch(e) { res.status(500).json({error: String(e)}); }
 });
 
@@ -588,38 +1357,144 @@ INSTRUCTIONS:
 app.patch("/api/tasks/:id/status", async (req, res) => {
   const { status } = req.body as { status?: string };
   try {
-    const s = status;
-    const dbStatus = s === 'To Do' ? 'open' : s === 'In Progress' ? 'waiting_on_engineering' : s === 'Waiting for Client' ? 'waiting_on_customer' : s === 'Blocked' ? 'closed' : 'resolved';
-    await pool.query('UPDATE support_tickets SET status=$1 WHERE id=$2', [dbStatus, req.params.id]);
-    const tasks = await getTasks();
-    res.json(tasks.find(t => t.id === req.params.id));
+    if (!isOneOf(TASK_STATUSES, status)) {
+      return res.status(400).json({ error: `Status must be one of: ${TASK_STATUSES.join(", ")}.` });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT id, project_id, progress_percent FROM gantt_tasks WHERE id = $1 LIMIT 1`,
+      [req.params.id],
+    );
+    const task = rows[0];
+    if (!task) return res.status(404).json({ error: "Task not found." });
+
+    await pool.query(
+      `
+        UPDATE gantt_tasks
+        SET
+          status = $1,
+          progress_percent = $2,
+          updated_at = NOW(),
+          completed_at = CASE WHEN $1 = 'done' THEN NOW() ELSE NULL END
+        WHERE id = $3
+      `,
+      [mapUiTaskStatus(status), taskProgressForStatus(status, Number(task.progress_percent ?? 0)), req.params.id],
+    );
+
+    await pool.query(
+      `
+        INSERT INTO gantt_task_activity (
+          project_id, org_id, task_id, event_type, new_value, message, created_at
+        )
+        SELECT project_id, org_id, id, 'task_status_changed', $1::jsonb, 'Task status updated from board.', NOW()
+        FROM gantt_tasks
+        WHERE id = $2
+      `,
+      [JSON.stringify({ status: mapUiTaskStatus(status) }), req.params.id],
+    );
+
+    await refreshProjectProgress(task.project_id);
+    const updated = (await getTasks(task.project_id)).find((item) => item.id === req.params.id);
+    res.json(updated);
   } catch(e) { res.status(500).json({error: String(e)}); }
 });
 
 // DELETE task
 app.delete("/api/tasks/:id", async (req, res) => {
   try {
-    await pool.query('DELETE FROM support_tickets WHERE id=$1', [req.params.id]);
+    const { rows } = await pool.query(`SELECT project_id FROM gantt_tasks WHERE id = $1 LIMIT 1`, [req.params.id]);
+    const task = rows[0];
+    if (!task) return res.status(404).json({ error: "Task not found." });
+    await pool.query('DELETE FROM gantt_tasks WHERE id=$1', [req.params.id]);
+    await refreshProjectProgress(task.project_id);
     res.json({ ok: true });
   } catch(e) { res.status(500).json({error: String(e)}); }
 });
 
 // GET comments for a task
-app.get("/api/tasks/:id/comments", (req, res) => {
-  res.json(([]).filter((c) => c.taskId === req.params.id));
+app.get("/api/tasks/:id/comments", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `
+        SELECT
+          c.id,
+          c.task_id,
+          COALESCE(u.full_name, 'Team Member') AS author,
+          c.body AS content,
+          c.created_at
+        FROM gantt_task_comments c
+        LEFT JOIN users u ON u.id = c.author_user_id
+        WHERE c.task_id = $1
+          AND c.deleted_at IS NULL
+        ORDER BY c.created_at ASC
+      `,
+      [req.params.id],
+    );
+
+    res.json(
+      rows.map((row) => ({
+        id: row.id,
+        taskId: row.task_id,
+        author: row.author,
+        content: row.content,
+        createdAt: new Date(row.created_at).toISOString(),
+      })),
+    );
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
 });
 
 // POST comment on a task
 app.post("/api/tasks/:id/comments", async (req, res) => {
-  const task = (await getTasks()).find((t) => t.id === req.params.id);
-  if (!task) return res.status(404).json({ error: "Task not found." });
-  const content = readText(req.body?.content);
-  const author = readText(req.body?.author) || "Team Member";
-  if (!content) return res.status(400).json({ error: "Comment content is required." });
-  const comment: Comment = { id: crypto.randomUUID(), taskId: req.params.id, author, content, createdAt: nowIso() };
-  
-  // Postgres save happens instantly via queries
-  res.status(201).json(comment);
+  try {
+    const { rows } = await pool.query(
+      `
+        SELECT t.id, t.project_id, t.org_id
+        FROM gantt_tasks t
+        WHERE t.id = $1
+        LIMIT 1
+      `,
+      [req.params.id],
+    );
+    const task = rows[0];
+    if (!task) return res.status(404).json({ error: "Task not found." });
+    const content = readText(req.body?.content);
+    const author = readText(req.body?.author) || "Team Member";
+    if (!content) return res.status(400).json({ error: "Comment content is required." });
+
+    const authorLookup = await pool.query(
+      `SELECT id FROM users WHERE org_id = $1 AND LOWER(full_name) = LOWER($2) LIMIT 1`,
+      [task.org_id, author],
+    );
+    const authorUserId = authorLookup.rows[0]?.id ?? null;
+    const commentId = crypto.randomUUID();
+
+    await pool.query(
+      `
+        INSERT INTO gantt_task_comments (
+          id, org_id, project_id, task_id, author_user_id, body, visibility, created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, 'internal', NOW())
+      `,
+      [commentId, task.org_id, task.project_id, task.id, authorUserId, content],
+    );
+
+    await pool.query(
+      `
+        INSERT INTO gantt_task_activity (
+          project_id, org_id, task_id, actor_user_id, event_type, message, created_at
+        )
+        VALUES ($1, $2, $3, $4, 'comment_added', $5, NOW())
+      `,
+      [task.project_id, task.org_id, task.id, authorUserId, content],
+    );
+
+    const comment: Comment = { id: commentId, taskId: task.id, author, content, createdAt: nowIso() };
+    res.status(201).json(comment);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
 });
 
 // ── Project members ──────────────────────────────────────────────────────────
@@ -627,18 +1502,9 @@ app.post("/api/tasks/:id/comments", async (req, res) => {
 // GET project members
 app.get("/api/projects/:id/members", async (req, res) => {
   try {
-    const project = (await getProjects()).find((p) => p.id === req.params.id);
+    const project = await getProjectDbRow(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found." });
-    const result = await pool.query('SELECT * FROM users WHERE organization_id = $1 ORDER BY name ASC', [req.params.id]);
-    const members = result.rows.map(u => ({
-      id: u.id,
-      projectId: u.organization_id,
-      name: u.name,
-      email: u.email,
-      title: u.title || "Team Member",
-      createdAt: u.created_at.toISOString()
-    }));
-    res.json(members);
+    res.json(await getProjectMembers(req.params.id));
   } catch (e) {
     res.status(500).json({error: String(e)});
   }
@@ -647,20 +1513,48 @@ app.get("/api/projects/:id/members", async (req, res) => {
 // POST add member
 app.post("/api/projects/:id/members", async (req, res) => {
   try {
-    const project = (await getProjects()).find((p) => p.id === req.params.id);
+    const project = await getProjectDbRow(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found." });
     const name = readText(req.body?.name);
     const email = readText(req.body?.email);
     const title = readText(req.body?.title) || "Team Member";
     if (!name || !email) return res.status(400).json({ error: "Name and email are required." });
-    
-    const newId = crypto.randomUUID();
-    await pool.query(
-      'INSERT INTO users (id, organization_id, email, name, title, status) VALUES ($1, $2, $3, $4, $5, $6)',
-      [newId, req.params.id, email, name, title, 'active']
+
+    let userId: string;
+    const existingUser = await pool.query(
+      `SELECT id FROM users WHERE org_id = $1 AND LOWER(email) = LOWER($2) LIMIT 1`,
+      [project.org_id, email],
     );
-    
-    const member = { id: newId, projectId: req.params.id, name, email, title, createdAt: nowIso() };
+
+    if (existingUser.rows[0]?.id) {
+      userId = existingUser.rows[0].id;
+      await pool.query(`UPDATE users SET full_name = $1, title = $2, updated_at = NOW() WHERE id = $3`, [name, title, userId]);
+    } else {
+      userId = crypto.randomUUID();
+      await pool.query(
+        `
+          INSERT INTO users (
+            id, org_id, email, full_name, title, department, status, mfa_enabled, locale, created_at, updated_at, metadata
+          )
+          VALUES ($1, $2, $3, $4, $5, 'Operations', 'active', FALSE, 'en', NOW(), NOW(), '{"source":"pm_app"}'::jsonb)
+        `,
+        [userId, project.org_id, email, name, title],
+      );
+    }
+
+    await pool.query(
+      `
+        INSERT INTO project_members (
+          project_id, user_id, project_role, allocation_percent, joined_at, left_at
+        )
+        VALUES ($1, $2, 'contributor', 35, NOW(), NULL)
+        ON CONFLICT (project_id, user_id) DO UPDATE
+        SET left_at = NULL, allocation_percent = 35
+      `,
+      [req.params.id, userId],
+    );
+
+    const member = (await getProjectMembers(req.params.id)).find((item) => item.id === userId);
     res.status(201).json(member);
   } catch (e) {
     res.status(500).json({error: String(e)});
@@ -672,13 +1566,20 @@ app.patch("/api/projects/:id/members/:memberId", async (req, res) => {
   try {
     const title = readText(req.body?.title);
     if (!title) return res.status(400).json({ error: "Title is required." });
-    
+
     await pool.query(
-      'UPDATE users SET title = $1 WHERE id = $2 AND organization_id = $3',
+      `
+        UPDATE users
+        SET title = $1, updated_at = NOW()
+        WHERE id = $2
+          AND org_id = (SELECT org_id FROM work_projects WHERE id = $3)
+      `,
       [title, req.params.memberId, req.params.id]
     );
-    
-    res.json({});
+
+    const member = (await getProjectMembers(req.params.id)).find((item) => item.id === req.params.memberId);
+    if (!member) return res.status(404).json({ error: "Member not found." });
+    res.json(member);
   } catch (e) {
     res.status(500).json({error: String(e)});
   }
@@ -688,8 +1589,12 @@ app.patch("/api/projects/:id/members/:memberId", async (req, res) => {
 app.delete("/api/projects/:id/members/:memberId", async (req, res) => {
   try {
     await pool.query(
-      'DELETE FROM users WHERE id = $1 AND organization_id = $2',
-      [req.params.memberId, req.params.id]
+      `
+        UPDATE project_members
+        SET left_at = NOW()
+        WHERE project_id = $1 AND user_id = $2
+      `,
+      [req.params.id, req.params.memberId]
     );
     res.json({ ok: true });
   } catch (e) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import {
   Element4,
@@ -21,8 +21,10 @@ import TaskForm from './pages/TaskForm';
 import CustomerView from './pages/CustomerView';
 import Submission from './pages/Submission';
 import AiChat from './pages/AiChat';
+import { api } from './services/api';
 import { cn } from './lib/utils';
 import { I18nProvider, useI18n } from './lib/i18n';
+import type { SystemStatus } from './types';
 
 interface NavItem {
   to: string;
@@ -67,8 +69,19 @@ function Navigation({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () 
   const location = useLocation();
   const { t, language, setLanguage, isRTL } = useI18n();
   const isCustomerView = location.pathname.includes('customer-view');
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+
+  useEffect(() => {
+    api.system.status()
+      .then(setSystemStatus)
+      .catch(console.error);
+  }, []);
 
   if (isCustomerView) return null;
+
+  const storageLabel = systemStatus?.storage === 'postgres'
+    ? (isRTL ? 'Postgres DB' : 'Postgres DB')
+    : (isRTL ? 'אחסון מקומי' : 'Local Storage');
 
   const navContent = (
     <div className="flex flex-col h-full">
@@ -120,7 +133,7 @@ function Navigation({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () 
           <div className="space-y-2.5">
             <div className="flex items-center gap-2 text-[11px] font-medium text-zinc-500">
               <Data variant="Linear" color="currentColor" size={13} className="text-zinc-400" />
-              <span>{isRTL ? 'אחסון מקומי' : 'Local Storage'}</span>
+              <span>{storageLabel}</span>
             </div>
             <div className="flex items-center gap-2 text-[11px] font-medium text-zinc-500">
               <Flash variant="Linear" color="currentColor" size={13} className="text-zinc-400" />

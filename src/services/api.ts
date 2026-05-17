@@ -1,4 +1,13 @@
-import { Project, Task, AISummary, CustomerUpdateResponse, SystemStatus, Comment, ProjectMember } from '../types';
+import {
+  Project,
+  Task,
+  AISummary,
+  CustomerUpdateResponse,
+  SystemStatus,
+  Comment,
+  ProjectMember,
+  ProjectGanttData,
+} from '../types';
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -21,6 +30,8 @@ export const api = {
       fetch('/api/projects').then(r => handleResponse<Project[]>(r)),
     get: (id: string): Promise<Project & { tasks: Task[]; members: ProjectMember[] }> =>
       fetch(`/api/projects/${id}`).then(r => handleResponse<Project & { tasks: Task[]; members: ProjectMember[] }>(r)),
+    gantt: (id: string): Promise<ProjectGanttData> =>
+      fetch(`/api/projects/${id}/gantt`).then(r => handleResponse<ProjectGanttData>(r)),
     create: (project: Partial<Project>): Promise<Project> =>
       fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(project) }).then(r => handleResponse<Project>(r)),
     update: (id: string, project: Partial<Project>): Promise<Project> =>

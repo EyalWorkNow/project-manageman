@@ -58,6 +58,12 @@ export function WorkflowGuide({ compact = false }: { compact?: boolean }) {
 export function SystemStatusPanel({ status }: { status: SystemStatus | null }) {
   const { isRTL } = useI18n();
   const isGemini = status?.aiMode === 'gemini';
+  const storageLabel = status?.storage === 'postgres'
+    ? (isRTL ? 'Postgres' : 'Postgres')
+    : (isRTL ? 'JSON מקומי' : 'Local JSON');
+  const persistenceLabel = status?.persistence
+    ? (isRTL ? 'נשמר אחרי ריסטארט' : 'Persists after restart')
+    : (isRTL ? 'זמני' : 'Ephemeral');
   const items = [
     {
       label: isRTL ? 'מנוע AI' : 'AI Engine',
@@ -67,13 +73,13 @@ export function SystemStatusPanel({ status }: { status: SystemStatus | null }) {
     },
     {
       label: isRTL ? 'שמירה' : 'Storage',
-      value: isRTL ? 'JSON מקומי' : 'Local JSON',
+      value: storageLabel,
       icon: <Data variant="Linear" color="currentColor" size={15} />,
       tone: 'text-blue-600 bg-blue-50 border-blue-100',
     },
     {
       label: isRTL ? 'מצב דמו' : 'Demo State',
-      value: isRTL ? 'נשמר אחרי ריסטארט' : 'Persists after restart',
+      value: persistenceLabel,
       icon: <TickCircle variant="Linear" color="currentColor" size={15} />,
       tone: 'text-zinc-600 bg-zinc-50 border-zinc-100',
     },

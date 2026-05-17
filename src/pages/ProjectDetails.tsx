@@ -5,7 +5,7 @@ import {
   Profile2User, FolderOpen, Send2, DocumentText, MessageText, Flash,
 } from 'iconsax-react';
 import { motion } from 'motion/react';
-import { Project, Task, AISummary, ProjectMember, STATUS_TRANSLATION_KEYS } from '../types';
+import { Project, Task, AISummary, ProjectGanttData, ProjectMember, STATUS_TRANSLATION_KEYS } from '../types';
 import { api } from '../services/api';
 import { cn, formatDate, daysUntil, STATUS_COLORS, PRIORITY_COLORS, STATUS_DOT, PRIORITY_DOT } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
@@ -13,6 +13,7 @@ import KanbanBoard from '../components/KanbanBoard';
 import TaskDetailModal from '../components/TaskDetailModal';
 import AiDraftPanel from '../components/AiDraftPanel';
 import ProjectMembersPanel from '../components/ProjectMembersPanel';
+import ProjectGanttPanel from '../components/ProjectGanttPanel';
 
 function ChevronRight({ size = 14, flip = false }: { size?: number; flip?: boolean }) {
   return (
@@ -40,7 +41,7 @@ type ProjectChatMessage = {
   timestamp: Date;
 };
 
-type Tab = 'board' | 'ai' | 'members';
+type Tab = 'board' | 'gantt' | 'ai' | 'members';
 
 export default function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +52,9 @@ export default function ProjectDetails() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [ganttData, setGanttData] = useState<ProjectGanttData | null>(null);
+  const [ganttLoading, setGanttLoading] = useState(false);
 
   const [activeTab, setActiveTab] = useState<Tab>('board');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -68,16 +72,70 @@ export default function ProjectDetails() {
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    Promise.all([api.projects.get(id), api.members.list(id)])
-      .then(([proj, mems]) => {
+    let cancelled = false;
+
+    async function loadProject() {
+      setLoading(true);
+      setLoadError(null);
+      setProject(null);
+      setTasks([]);
+      setMembers([]);
+      setGanttData(null);
+
+      try {
+        const proj = await api.projects.get(id);
+        if (cancelled) return;
+
         setProject(proj);
         setTasks(proj.tasks || []);
-        setMembers(mems);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+        setMembers(proj.members || []);
+
+        const [membersResult, ganttResult] = await Promise.allSettled([
+          api.members.list(id),
+          api.projects.gantt(id),
+        ]);
+
+        if (cancelled) return;
+
+        if (membersResult.status === 'fulfilled') {
+          setMembers(membersResult.value);
+        } else {
+          console.error(membersResult.reason);
+        }
+
+        if (ganttResult.status === 'fulfilled') {
+          setGanttData(ganttResult.value);
+        } else {
+          console.error(ganttResult.reason);
+        }
+      } catch (error) {
+        console.error(error);
+        if (cancelled) return;
+
+        const message = error instanceof Error ? error.message : 'Could not load project.';
+        setLoadError(message);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProject();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
+
+  useEffect(() => {
+    if (!id || activeTab !== 'gantt' || ganttData || ganttLoading) return;
+    setGanttLoading(true);
+    api.projects.gantt(id)
+      .then(setGanttData)
+      .catch(console.error)
+      .finally(() => setGanttLoading(false));
+  }, [activeTab, ganttData, ganttLoading, id]);
 
   // ── Skeleton ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -95,14 +153,22 @@ export default function ProjectDetails() {
   if (!project) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#FAFAFA]">
-        <p className="text-zinc-500 font-semibold">{isRTL ? 'פרויקט לא נמצא.' : 'Project not found.'}</p>
+        <p className="text-zinc-500 font-semibold">
+          {loadError && loadError !== 'Project not found.'
+            ? (isRTL ? 'לא ניתן לטעון את הפרויקט כרגע.' : 'Could not load the project right now.')
+            : (isRTL ? 'פרויקט לא נמצא.' : 'Project not found.')}
+        </p>
       </div>
     );
   }
 
   const completedTasks = tasks.filter(t => t.status === 'Done').length;
-  const progress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+  const activeTasks = tasks.filter(t => t.status === 'To Do' || t.status === 'In Progress' || t.status === 'Waiting for Client').length;
   const blockedTasks = tasks.filter(t => t.isBlocked);
+  const progress = ganttData?.health.progressPercent
+    ?? (tasks.length > 0
+      ? Math.round(tasks.reduce((sum, task) => sum + (task.progressPercent ?? (task.status === 'Done' ? 100 : 0)), 0) / tasks.length)
+      : 0);
   const days = project.deadline ? daysUntil(project.deadline) : null;
 
   const progressColor =
@@ -190,6 +256,7 @@ export default function ProjectDetails() {
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'board',   label: isRTL ? `לוח (${tasks.length})` : `Board (${tasks.length})` },
+    { id: 'gantt',   label: isRTL ? 'גאנט פרויקט' : 'Project Gantt' },
     { id: 'ai',      label: isRTL ? 'עוזר חכם' : 'Smart Assistant' },
     { id: 'members', label: isRTL ? `משתתפים (${members.length})` : `Members (${members.length})` },
   ];
@@ -268,7 +335,9 @@ export default function ProjectDetails() {
               />
             </div>
             <p className="text-xs text-zinc-500">
-              {completedTasks} / {tasks.length} {isRTL ? 'משימות הושלמו' : 'tasks done'}
+              {isRTL
+                ? `${activeTasks} פעילות · ${blockedTasks.length} חסומות · ${completedTasks} הושלמו`
+                : `${activeTasks} active · ${blockedTasks.length} blocked · ${completedTasks} done`}
             </p>
           </div>
 
@@ -374,6 +443,15 @@ export default function ProjectDetails() {
                 />
               )}
             </div>
+          )}
+
+          {activeTab === 'gantt' && (
+            <ProjectGanttPanel
+              data={ganttData}
+              members={members}
+              loading={ganttLoading}
+              isRTL={isRTL}
+            />
           )}
 
           {/* ── AI TAB ────────────────────────────────────────────────────── */}
