@@ -5,28 +5,30 @@ import { Pool } from "pg";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import {
-  PROJECT_STATUSES,
-  TASK_PRIORITIES,
-  TASK_STATUSES,
-  type AISummary,
-  type Comment,
-  type GanttActivityItem,
-  type GanttMilestone,
-  type GanttProjectHealth,
-  type GanttResourceLoad,
-  type GanttTimelineTask,
-  type Project,
-  type ProjectDecisionItem,
-  type ProjectGanttData,
-  type ProjectMember,
-  type ProjectStatus,
-  type Task,
-  type TaskDependencyLink,
-  type TaskDetailContext,
-  type TaskPriority,
-  type TaskStatus,
-} from "./src/types";
+// Inlined from src/types.ts — avoids a cross-directory ESM import that breaks on Vercel
+const PROJECT_STATUSES = ['On Track', 'At Risk', 'Blocked', 'Completed'] as const;
+const TASK_STATUSES = ['To Do', 'In Progress', 'Waiting for Client', 'Blocked', 'Done'] as const;
+const TASK_PRIORITIES = ['Low', 'Medium', 'High', 'Critical'] as const;
+
+import type {
+  AISummary,
+  Comment,
+  GanttActivityItem,
+  GanttMilestone,
+  GanttProjectHealth,
+  GanttResourceLoad,
+  GanttTimelineTask,
+  Project,
+  ProjectDecisionItem,
+  ProjectGanttData,
+  ProjectMember,
+  ProjectStatus,
+  Task,
+  TaskDependencyLink,
+  TaskDetailContext,
+  TaskPriority,
+  TaskStatus,
+} from "./src/types.js";
 
 dotenv.config();
 
@@ -37,6 +39,13 @@ const DATA_FILE = path.join(DATA_DIR, "syncpro-db.json");
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
 
 app.use(express.json({ limit: "1mb" }));
+
+app.use((req, _res, next) => {
+  if (process.env.VERCEL && req.url && !req.url.startsWith("/api")) {
+    req.url = `/api${req.url.startsWith("/") ? req.url : `/${req.url}`}`;
+  }
+  next();
+});
 
 const geminiKey = process.env.GEMINI_API_KEY?.trim();
 const ai = geminiKey

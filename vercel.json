@@ -1,19 +1,8 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "server.ts",
-      "use": "@vercel/node",
-      "config": {
-        "buildCommand": "vite build",
-        "includeFiles": ["dist/**", "public/**"]
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/server.ts"
-    }
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
