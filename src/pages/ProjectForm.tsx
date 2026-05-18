@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft2, Save2, Refresh2, InfoCircle } from 'iconsax-react';
+import { ArrowLeft2, Save2, Refresh2, InfoCircle, Folder2, Profile2User, Calendar1, DocumentText, StatusUp } from 'iconsax-react';
 import { api } from '../services/api';
 import { Project, PROJECT_STATUSES, STATUS_TRANSLATION_KEYS } from '../types';
 import { useI18n } from '../lib/i18n';
@@ -63,15 +63,20 @@ export default function ProjectForm() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="btn-secondary w-10 h-10 !p-0 rounded-2xl flex items-center justify-center flex-shrink-0 text-zinc-700 hover:text-zinc-900"
+            className="btn-secondary w-10 h-10 !p-0 rounded-2xl flex items-center justify-center flex-shrink-0 text-zinc-700 hover:text-zinc-900 icon-action"
           >
-            <ArrowLeft2 variant="Linear" color="currentColor" size={16} className={isRTL ? 'rotate-180' : ''} />
+            <ArrowLeft2 variant="Linear" color="currentColor" size={16} className={cn('icon-micro', isRTL ? 'rotate-180' : '')} />
           </button>
-          <div className={isRTL ? 'text-right' : ''}>
+          <div className={cn('flex items-center gap-3', isRTL ? 'flex-row-reverse text-right' : '')}>
+            <div className="icon-shell">
+              <Folder2 variant="Linear" color="currentColor" size={16} className="icon-micro text-zinc-800" />
+            </div>
+            <div className={isRTL ? 'text-right' : ''}>
             <h1 className="text-xl font-bold text-zinc-900">
               {id ? t('project.form.title_edit') : t('project.form.title_new')}
             </h1>
             <p className="text-sm text-zinc-500 mt-0.5">{t('project.form.subtitle') || 'Configure project details'}</p>
+            </div>
           </div>
         </div>
 
@@ -85,7 +90,8 @@ export default function ProjectForm() {
           )}
 
           <div>
-            <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+            <label className="label-with-icon">
+              <Folder2 variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
               {t('project.form.identity') || 'Project Name'} <span className="text-red-500">*</span>
             </label>
             <input
@@ -99,7 +105,8 @@ export default function ProjectForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+              <label className="label-with-icon">
+                <Profile2User variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                 {t('project.form.client') || 'Client'} <span className="text-red-500">*</span>
               </label>
               <input
@@ -111,7 +118,8 @@ export default function ProjectForm() {
               />
             </div>
             <div>
-              <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+              <label className="label-with-icon">
+                <Profile2User variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                 {t('project.form.steward') || 'Lead PM'} <span className="text-red-500">*</span>
               </label>
               <input
@@ -125,7 +133,8 @@ export default function ProjectForm() {
           </div>
 
           <div>
-            <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+            <label className="label-with-icon">
+              <DocumentText variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
               {t('project.form.scope') || 'Description'}
             </label>
             <textarea
@@ -139,7 +148,8 @@ export default function ProjectForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+              <label className="label-with-icon">
+                <StatusUp variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                 {t('project.form.status') || 'Status'} <span className="text-red-500">*</span>
               </label>
               <select
@@ -153,7 +163,8 @@ export default function ProjectForm() {
               </select>
             </div>
             <div>
-              <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+              <label className="label-with-icon">
+                <Calendar1 variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                 {t('project.form.target') || 'Deadline'} <span className="text-red-500">*</span>
               </label>
               <input
@@ -169,9 +180,9 @@ export default function ProjectForm() {
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+            className={cn('btn-primary w-full py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 text-sm icon-action', isRTL && 'flex-row-reverse')}
           >
-            {loading ? <Refresh2 variant="Linear" color="currentColor" className="animate-spin" size={16} /> : <Save2 variant="Linear" color="currentColor" size={16} />}
+            {loading ? <Refresh2 variant="Linear" color="currentColor" className="animate-spin icon-micro" size={16} /> : <Save2 variant="Linear" color="currentColor" className="icon-micro" size={16} />}
             {id ? t('project.form.submit_edit') : t('project.form.submit_new')}
           </button>
         </form>

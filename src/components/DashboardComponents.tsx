@@ -12,9 +12,9 @@ export function InfoTooltip({ content }: { content: string }) {
   return (
     <div className={cn('group/tooltip relative inline-block', isRTL ? 'mr-1' : 'ml-1')}>
       <InfoCircle variant="Linear" color="currentColor" size={13} className="text-zinc-300 hover:text-blue-500 transition-colors cursor-help" />
-      <div className="absolute bottom-full left-1/2 -tranzinc-x-1/2 mb-2 w-48 p-2.5 bg-zinc-900 text-white text-[10px] font-medium leading-relaxed rounded-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 shadow-xl pointer-events-none text-center">
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-zinc-900 text-white text-[10px] font-medium leading-relaxed rounded-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 shadow-xl pointer-events-none text-center">
         {content}
-        <div className="absolute top-full left-1/2 -tranzinc-x-1/2 border-6 border-transparent border-t-zinc-900" />
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-zinc-900" />
       </div>
     </div>
   );
@@ -35,17 +35,19 @@ export function KPICard({
   warning?: boolean;
   description: string;
 }) {
+  const { isRTL } = useI18n();
+
   return (
     <div className={cn(
-      'bg-white rounded-2xl border border-zinc-100 shadow-sm hover:shadow-md transition-all p-5 group cursor-default',
+      'bg-white rounded-2xl border border-zinc-100 shadow-sm hover:shadow-md transition-all p-5 group cursor-default icon-action',
       warning && 'border-red-100 bg-red-50/30'
     )}>
-      <div className="flex items-start justify-between mb-4">
+      <div className={cn('flex items-start justify-between mb-4', isRTL && 'flex-row-reverse')}>
         <div className={cn(
-          'w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm',
+          'icon-shell h-10 w-10',
           warning ? 'bg-red-100 text-red-600' : 'bg-zinc-100 text-zinc-900'
         )}>
-          {icon}
+          <span className="icon-micro">{icon}</span>
         </div>
         {trend && (
           <span className={cn(
@@ -56,11 +58,11 @@ export function KPICard({
           </span>
         )}
       </div>
-      <div className="flex items-center gap-1 mb-1">
+      <div className={cn('flex items-center gap-1 mb-1', isRTL && 'flex-row-reverse justify-end')}>
         <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{label}</p>
         <InfoTooltip content={description} />
       </div>
-      <p className={cn('text-2xl font-bold tracking-tight', warning && value !== 0 ? 'text-red-600' : 'text-zinc-900')}>
+      <p className={cn('text-2xl font-bold tracking-tight', isRTL && 'text-right', warning && value !== 0 ? 'text-red-600' : 'text-zinc-900')}>
         {value}
       </p>
     </div>
@@ -80,10 +82,10 @@ export function ProjectCard({ project }: { project: Project; key?: React.Key }) 
   return (
     <Link
       to={`/projects/${project.id}`}
-      className="group block bg-white rounded-2xl border border-zinc-100 p-5 hover:shadow-lg hover:shadow-blue-500/5 hover:-tranzinc-y-0.5 transition-all cursor-pointer"
+      className="group block bg-white rounded-2xl border border-zinc-100 p-5 hover:shadow-lg hover:shadow-blue-500/5 hover:-translate-y-0.5 transition-all cursor-pointer"
     >
       <div className={cn('flex items-start justify-between mb-4', isRTL && 'flex-row-reverse')}>
-        <div className="flex items-center gap-2">
+        <div className={cn('flex items-center gap-2', isRTL && 'flex-row-reverse')}>
           <div className={cn('w-2 h-2 rounded-full shrink-0', STATUS_RING[project.status] || 'bg-zinc-300')} />
           <span className={cn(
             'text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border',
@@ -93,7 +95,7 @@ export function ProjectCard({ project }: { project: Project; key?: React.Key }) 
           </span>
         </div>
         <div className="w-7 h-7 rounded-full bg-zinc-50 flex items-center justify-center text-zinc-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-          <ArrowRight2 variant="Linear" color="currentColor" size={14} className={isRTL ? 'rotate-180' : ''} />
+          <ArrowRight2 variant="Linear" color="currentColor" size={14} className={cn('icon-micro', isRTL ? 'rotate-180' : '')} />
         </div>
       </div>
 
@@ -108,14 +110,14 @@ export function ProjectCard({ project }: { project: Project; key?: React.Key }) 
       </p>
 
       <div className={cn('flex items-center justify-between pt-4 border-t border-zinc-50', isRTL && 'flex-row-reverse')}>
-        <div className="flex items-center gap-2">
+        <div className={cn('flex items-center gap-2', isRTL && 'flex-row-reverse')}>
           <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[9px] font-bold text-white">
             {project.projectManager.charAt(0)}
           </div>
           <span className="text-[11px] font-semibold text-zinc-600">{project.projectManager}</span>
         </div>
-        <div className="flex items-center gap-1 text-[11px] text-zinc-400">
-          <Calendar variant="Linear" color="currentColor" size={12} className="text-zinc-300" />
+        <div className={cn('flex items-center gap-1 text-[11px] text-zinc-400', isRTL && 'flex-row-reverse')}>
+          <Calendar variant="Linear" color="currentColor" size={12} className="text-zinc-300 icon-micro" />
           {formatDate(project.deadline)}
         </div>
       </div>
@@ -143,8 +145,8 @@ export function DailyBrief({ projects: _projects, tasks: _tasks }: { projects: P
   return (
     <div className={cn('bg-white rounded-2xl border border-zinc-100 shadow-sm p-5', isRTL && 'text-right')}>
       <div className={cn('flex items-center gap-2 mb-4', isRTL && 'flex-row-reverse')}>
-        <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center">
-          <Magicpen variant="Linear" color="currentColor" size={14} className="text-blue-600" />
+        <div className="icon-shell h-8 w-8">
+          <Magicpen variant="Linear" color="currentColor" size={14} className="text-blue-600 icon-micro" />
         </div>
         <h3 className="text-xs font-bold text-zinc-700 uppercase tracking-wider">{t('dash.daily_brief')}</h3>
       </div>
@@ -164,9 +166,9 @@ export function DailyBrief({ projects: _projects, tasks: _tasks }: { projects: P
         <button
           onClick={generateBrief}
           disabled={loading}
-          className="w-full py-2.5 bg-zinc-900 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+          className={cn('w-full py-2.5 bg-zinc-900 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer icon-action', isRTL && 'flex-row-reverse')}
         >
-          {loading ? <RotateLeft variant="Linear" color="currentColor" className="animate-spin" size={13} /> : <TrendUp variant="Linear" color="currentColor" size={13} />}
+          {loading ? <RotateLeft variant="Linear" color="currentColor" className="animate-spin icon-micro" size={13} /> : <TrendUp variant="Linear" color="currentColor" className="icon-micro" size={13} />}
           {loading ? (isRTL ? 'מנתח...' : 'Analyzing...') : (isRTL ? 'הפק תדרוך' : 'Generate Brief')}
         </button>
       ) : (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft2, Save2, Refresh2, InfoCircle, Image as ImageIcon, Microphone2, Magicpen, CloseCircle, UserAdd, StopCircle, Play, Paperclip2 } from 'iconsax-react';
+import { ArrowLeft2, Save2, Refresh2, InfoCircle, Image as ImageIcon, Microphone2, Magicpen, CloseCircle, UserAdd, StopCircle, Play, Paperclip2, ClipboardText, DocumentText, Folder2, Calendar1, StatusUp, Tag } from 'iconsax-react';
 import { Task, Project, ProjectMember, TASK_PRIORITIES, TASK_STATUSES, STATUS_TRANSLATION_KEYS, PRIORITY_TRANSLATION_KEYS } from '../types';
 import { api } from '../services/api';
 import { cn } from '../lib/utils';
@@ -165,15 +165,20 @@ export default function TaskForm() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="btn-secondary w-10 h-10 !p-0 rounded-2xl flex items-center justify-center flex-shrink-0 text-zinc-700 hover:text-zinc-900"
+            className="btn-secondary w-10 h-10 !p-0 rounded-2xl flex items-center justify-center flex-shrink-0 text-zinc-700 hover:text-zinc-900 icon-action"
           >
-            <ArrowLeft2 variant="Linear" color="currentColor" size={16} className={isRTL ? 'rotate-180' : ''} />
+            <ArrowLeft2 variant="Linear" color="currentColor" size={16} className={cn('icon-micro', isRTL ? 'rotate-180' : '')} />
           </button>
-          <div className={isRTL ? 'text-right' : ''}>
+          <div className={cn('flex items-center gap-3', isRTL ? 'flex-row-reverse text-right' : '')}>
+            <div className="icon-shell">
+              <ClipboardText variant="Linear" color="currentColor" size={16} className="icon-micro text-zinc-800" />
+            </div>
+            <div className={isRTL ? 'text-right' : ''}>
             <h1 className="text-xl font-bold text-zinc-900">
               {taskId ? t('task.form.title_edit') : t('task.form.title_new')}
             </h1>
             <p className="text-sm text-zinc-500 mt-0.5">{t('task.form.subtitle') || 'Specify task ownership, state, priority, and blockers.'}</p>
+            </div>
           </div>
         </div>
 
@@ -191,7 +196,8 @@ export default function TaskForm() {
 
             <div className="card p-6 space-y-6">
               <div>
-                <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+                <label className="label-with-icon">
+                  <ClipboardText variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                   {t('task.form.identity') || 'Task Title'} <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -204,16 +210,17 @@ export default function TaskForm() {
               </div>
 
               <div>
-                <div className={cn('flex items-center justify-between mb-1.5', isRTL && 'flex-row-reverse')}>
-                  <label className="block text-sm font-semibold text-zinc-900">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="label-with-icon !mb-0">
+                    <DocumentText variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                     {t('task.form.context') || 'Description'}
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowAiPrompt(!showAiPrompt)}
-                    className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer icon-action"
                   >
-                    <Magicpen variant="Linear" color="currentColor" size={12} />
+                    <Magicpen variant="Linear" color="currentColor" size={12} className="icon-micro" />
                     {isRTL ? 'ניסוח בעזרת AI' : 'AI Formulation'}
                   </button>
                 </div>
@@ -231,9 +238,9 @@ export default function TaskForm() {
                       type="button"
                       onClick={handleAiFormulate}
                       disabled={aiLoading}
-                      className="bg-white text-zinc-900 px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-zinc-200 transition-colors disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                      className={cn('bg-white text-zinc-900 px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-zinc-200 transition-colors disabled:opacity-50 flex items-center gap-1 cursor-pointer icon-action', isRTL && 'flex-row-reverse')}
                     >
-                      {aiLoading ? <Refresh2 variant="Linear" color="currentColor" size={12} className="animate-spin" /> : <Magicpen variant="Linear" color="currentColor" size={12} />}
+                      {aiLoading ? <Refresh2 variant="Linear" color="currentColor" size={12} className="animate-spin icon-micro" /> : <Magicpen variant="Linear" color="currentColor" size={12} className="icon-micro" />}
                       {isRTL ? 'נסח עכשיו' : 'Optimize'}
                     </button>
                   </div>
@@ -250,15 +257,15 @@ export default function TaskForm() {
                   
                   {/* Attachments Display */}
                   {(images.length > 0 || recordings.length > 0) && (
-                    <div className={cn('px-4 py-2 border-t border-zinc-100 flex flex-wrap gap-2', isRTL && 'flex-row-reverse')}>
+                    <div className={cn('px-4 py-2 border-t border-zinc-100 flex flex-wrap gap-2', isRTL && 'flex-row-reverse justify-end')}>
                       {images.map((img, i) => (
-                        <div key={i} className="flex items-center gap-1.5 bg-zinc-100 text-zinc-700 px-2 py-1 rounded-lg text-[10px] font-bold">
+                        <div key={i} className={cn('flex items-center gap-1.5 bg-zinc-100 text-zinc-700 px-2 py-1 rounded-lg text-[10px] font-bold', isRTL && 'flex-row-reverse')}>
                           <ImageIcon variant="Linear" color="currentColor" size={10} /> Image_{i+1}.png
                           <button type="button" className="cursor-pointer" onClick={() => setImages(images.filter((_, idx) => idx !== i))}><CloseCircle variant="Linear" color="currentColor" size={10} className="hover:text-red-500" /></button>
                         </div>
                       ))}
                       {recordings.map((rec, i) => (
-                        <div key={i} className="flex items-center gap-1.5 bg-zinc-100 text-zinc-700 px-2 py-1 rounded-lg text-[10px] font-bold">
+                        <div key={i} className={cn('flex items-center gap-1.5 bg-zinc-100 text-zinc-700 px-2 py-1 rounded-lg text-[10px] font-bold', isRTL && 'flex-row-reverse')}>
                           <Play variant="Linear" color="currentColor" size={10} /> Audio_{i+1} ({rec}s)
                           <button type="button" className="cursor-pointer" onClick={() => setRecordings(recordings.filter((_, idx) => idx !== i))}><CloseCircle variant="Linear" color="currentColor" size={10} className="hover:text-red-500" /></button>
                         </div>
@@ -296,13 +303,14 @@ export default function TaskForm() {
                         <Paperclip2 variant="Linear" color="currentColor" size={14} />
                       </button>
                     </div>
-                    {isRecording && <span className="text-[10px] font-bold text-red-500 animate-pulse px-2">Recording...</span>}
+                    {isRecording && <span className={cn('text-[10px] font-bold text-red-500 animate-pulse px-2', isRTL && 'text-right')}>Recording...</span>}
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className={cn('flex items-center gap-2 text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'flex-row-reverse text-right')}>
+                <label className="label-with-icon">
+                  <DocumentText variant="Linear" color="currentColor" size={14} className="text-amber-600" />
                   {t('task.form.internal_notes') || 'Internal Notes'}
                   <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
                     {t('label.internal') || 'INTERNAL'}
@@ -319,7 +327,7 @@ export default function TaskForm() {
             </div>
 
             {/* Blocker card */}
-            <div className={cn(
+              <div className={cn(
               'card p-6 transition-all',
               formData.isBlocked ? 'bg-red-50 border-l-4 border-l-red-500 border-[#fca5a5]' : ''
             )}>
@@ -351,7 +359,8 @@ export default function TaskForm() {
 
               {formData.isBlocked && (
                 <div className="mt-5 pt-5 border-t border-red-200 space-y-2">
-                  <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+                  <label className="label-with-icon">
+                    <InfoCircle variant="Linear" color="currentColor" size={14} className="text-red-500" />
                     {t('task.form.blocker_desc') || 'Blocker description'} <span className="text-red-500">*</span>
                   </label>
                   <textarea
@@ -372,7 +381,8 @@ export default function TaskForm() {
             <div className="card p-6 space-y-5">
 
               <div>
-                <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+                <label className="label-with-icon">
+                  <Folder2 variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                   {t('task.form.parent') || 'Project'} <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -389,7 +399,8 @@ export default function TaskForm() {
               </div>
 
               <div>
-                <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+                <label className="label-with-icon">
+                  <UserAdd variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                   {t('task.form.owner') || 'Assignees & Participants'} <span className="text-red-500">*</span>
                 </label>
                 
@@ -428,7 +439,7 @@ export default function TaskForm() {
                           key={user}
                           type="button"
                           onClick={() => handleAddUser(user)}
-                          className="px-2 py-1 rounded-lg border border-zinc-200/50 text-[10px] font-bold text-zinc-500 hover:text-zinc-900 hover:border-zinc-300 transition-all cursor-pointer"
+                          className={cn('px-2 py-1 rounded-lg border border-zinc-200/50 text-[10px] font-bold text-zinc-500 hover:text-zinc-900 hover:border-zinc-300 transition-all cursor-pointer', isRTL && 'text-right')}
                         >
                           + {user}
                         </button>
@@ -439,7 +450,8 @@ export default function TaskForm() {
               </div>
 
               <div>
-                <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+                <label className="label-with-icon">
+                  <StatusUp variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                   {t('task.form.state') || 'Status'} <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -454,7 +466,8 @@ export default function TaskForm() {
               </div>
 
               <div>
-                <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+                <label className="label-with-icon">
+                  <Tag variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                   {t('task.form.impact') || 'Priority'} <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -469,7 +482,8 @@ export default function TaskForm() {
               </div>
 
               <div>
-                <label className={cn('block text-sm font-semibold text-zinc-900 mb-1.5', isRTL && 'text-right')}>
+                <label className="label-with-icon">
+                  <Calendar1 variant="Linear" color="currentColor" size={14} className="text-zinc-500" />
                   {t('task.form.due') || 'Due Date'} <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -484,9 +498,9 @@ export default function TaskForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-primary w-full py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                className={cn('btn-primary w-full py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 text-sm icon-action', isRTL && 'flex-row-reverse')}
               >
-                {loading ? <Refresh2 variant="Linear" color="currentColor" className="animate-spin" size={16} /> : <Save2 variant="Linear" color="currentColor" size={16} />}
+                {loading ? <Refresh2 variant="Linear" color="currentColor" className="animate-spin icon-micro" size={16} /> : <Save2 variant="Linear" color="currentColor" className="icon-micro" size={16} />}
                 {t('task.form.submit') || (taskId ? 'Update Task' : 'Save2 Task')}
               </button>
             </div>

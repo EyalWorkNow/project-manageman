@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft2, Magicpen, Add, Warning2, Eye, Edit2,
-  Profile2User, FolderOpen, Send2, DocumentText, MessageText, Flash, ClipboardText, TickCircle,
+  Profile2User, FolderOpen, Send2, DocumentText, MessageText, Flash, ClipboardText, TickCircle, Calendar1, Activity,
 } from 'iconsax-react';
 import { motion } from 'motion/react';
 import { Project, Task, AISummary, ProjectGanttData, ProjectMember, ProjectDecisionItem, ChatMessage, STATUS_TRANSLATION_KEYS } from '../types';
@@ -460,9 +460,9 @@ export default function ProjectDetails() {
           <div className={cn('flex items-center gap-3 min-w-0', isRTL && 'flex-row-reverse')}>
             <Link
               to="/"
-              className="btn-secondary w-9 h-9 !p-0 rounded-lg flex items-center justify-center flex-shrink-0 text-zinc-700 hover:text-zinc-900"
+              className="btn-secondary w-9 h-9 !p-0 rounded-lg flex items-center justify-center flex-shrink-0 text-zinc-700 hover:text-zinc-900 icon-action"
             >
-              <ArrowLeft2 size={16} color="currentColor" className={isRTL ? 'rotate-180' : ''} />
+              <ArrowLeft2 size={16} color="currentColor" className={cn('icon-micro', isRTL ? 'rotate-180' : '')} />
             </Link>
             <div className="min-w-0">
               <div className={cn('flex items-center gap-2 flex-wrap', isRTL && 'flex-row-reverse')}>
@@ -481,23 +481,23 @@ export default function ProjectDetails() {
           <div className={cn('flex items-center gap-2 flex-shrink-0', isRTL && 'flex-row-reverse')}>
             <button
               onClick={() => navigate(`/projects/edit/${id}`)}
-              className="btn-secondary text-xs font-semibold px-3 h-9 rounded-lg hidden sm:flex items-center gap-1.5"
+              className={cn('btn-secondary text-xs font-semibold px-3 h-9 rounded-lg hidden sm:flex items-center gap-1.5 icon-action', isRTL && 'flex-row-reverse')}
             >
-              <Edit2 size={13} color="currentColor" />
+              <Edit2 size={13} color="currentColor" className="icon-micro" />
               {isRTL ? 'עריכה' : 'Edit'}
             </button>
             <button
               onClick={() => navigate(`/projects/${id}/customer-view`)}
-              className="btn-secondary text-xs font-semibold px-3 h-9 rounded-lg flex items-center gap-1.5"
+              className={cn('btn-secondary text-xs font-semibold px-3 h-9 rounded-lg flex items-center gap-1.5 icon-action', isRTL && 'flex-row-reverse')}
             >
-              <Eye size={13} color="currentColor" />
+              <Eye size={13} color="currentColor" className="icon-micro" />
               <span className="hidden sm:inline">{t('project.details.external_view') || 'Customer View'}</span>
             </button>
             <button
               onClick={() => navigate(`/tasks/new?projectId=${id}`)}
-              className="btn-primary text-xs font-semibold px-3 h-9 rounded-lg flex items-center gap-1.5"
+              className={cn('btn-primary text-xs font-semibold px-3 h-9 rounded-lg flex items-center gap-1.5 icon-action', isRTL && 'flex-row-reverse')}
             >
-              <Add size={13} color="white" />
+              <Add size={13} color="white" className="icon-micro" />
               <span className="hidden sm:inline">{t('project.details.new_task') || 'New Task'}</span>
             </button>
           </div>
@@ -510,7 +510,10 @@ export default function ProjectDetails() {
         {/* Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-6 md:px-8">
           {/* Progress */}
-          <div className="card p-5 flex flex-col gap-3">
+          <div className="card p-5 flex flex-col gap-3 icon-action">
+            <div className="icon-shell">
+              <Activity size={16} color="currentColor" className="text-zinc-800 icon-micro" />
+            </div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
               {t('project.details.execution') || 'Progress'}
             </p>
@@ -531,7 +534,10 @@ export default function ProjectDetails() {
           </div>
 
           {/* PM / Client */}
-          <div className="card p-5 flex flex-col gap-2">
+          <div className="card p-5 flex flex-col gap-2 icon-action">
+            <div className="icon-shell">
+              <Profile2User size={16} color="currentColor" className="text-zinc-800 icon-micro" />
+            </div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
               {t('project.details.account_lead') || 'PM / Client'}
             </p>
@@ -543,7 +549,10 @@ export default function ProjectDetails() {
           </div>
 
           {/* Deadline */}
-          <div className="card p-5 flex flex-col gap-2">
+          <div className="card p-5 flex flex-col gap-2 icon-action">
+            <div className="icon-shell">
+              <Calendar1 size={16} color="currentColor" className="text-zinc-800 icon-micro" />
+            </div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
               {t('project.details.target') || 'Deadline'}
             </p>
@@ -628,7 +637,7 @@ export default function ProjectDetails() {
                   </p>
                   <button
                     onClick={() => navigate(`/tasks/new?projectId=${id}`)}
-                    className="btn-primary mt-6 px-5 py-2.5 text-sm font-semibold rounded-lg flex items-center gap-2"
+                    className={cn('btn-primary mt-6 px-5 py-2.5 text-sm font-semibold rounded-lg flex items-center gap-2', isRTL && 'flex-row-reverse')}
                   >
                     <Add size={14} color="white" />
                     {isRTL ? 'הוסף משימה ראשונה' : 'Add First Task'}

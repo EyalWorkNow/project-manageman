@@ -15,9 +15,9 @@ export default function Submission() {
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-100 rounded-full text-zinc-900 text-[10px] font-bold uppercase tracking-widest">
           {t('submission.artifact_label') || copy.artifact}
         </div>
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold text-zinc-900 tracking-tight font-display">{copy.title}</h1>
-          <p className="text-lg font-medium text-zinc-500">{copy.subtitle}</p>
+        <div className={cn('space-y-2', isRTL && 'text-right')}>
+          <h1 className={cn('text-4xl font-bold text-zinc-900 tracking-tight font-display', isRTL && 'text-right')}>{copy.title}</h1>
+          <p className={cn('text-lg font-medium text-zinc-500', isRTL && 'text-right')}>{copy.subtitle}</p>
         </div>
       </header>
 
@@ -31,13 +31,16 @@ export default function Submission() {
           <BriefBlock icon={<TickCircle variant="Linear" color="currentColor" size={14} />} title={copy.mvpTitle} body={copy.mvpBody} isRTL={isRTL} />
           <BriefBlock icon={<Shield variant="Linear" color="currentColor" size={14} />} title={copy.optimizationTitle} body={copy.optimizationBody} isRTL={isRTL} />
           <BriefBlock icon={<EyeSlash variant="Linear" color="currentColor" size={14} />} title={copy.outTitle} body={copy.outBody} isRTL={isRTL} />
+          <BriefBlock icon={<ArrowRight variant="Linear" color="currentColor" size={14} />} title={copy.interactionTitle} body={copy.interactionBody} isRTL={isRTL} />
+          <BriefBlock icon={<Shield variant="Linear" color="currentColor" size={14} />} title={copy.uxTitle} body={copy.uxBody} isRTL={isRTL} />
+          <BriefBlock icon={<TickCircle variant="Linear" color="currentColor" size={14} />} title={copy.metricsTitle} body={copy.metricsBody} isRTL={isRTL} />
         </div>
 
         <div className="rounded-3xl bg-zinc-50 border border-zinc-100 p-8 space-y-4">
           <h3 className={cn('text-[10px] font-bold text-zinc-400 uppercase tracking-widest', isRTL && 'text-right')}>{copy.workflowTitle}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
             {copy.workflow.map((step, index) => (
-              <div key={step} className="rounded-2xl bg-white border border-zinc-100 p-5">
+              <div key={step} className={cn('rounded-2xl bg-white border border-zinc-100 p-5', isRTL && 'text-right')}>
                 <p className="text-zinc-900 font-mono font-bold text-sm">0{index + 1}</p>
                 <p className={cn('text-sm font-bold text-zinc-900 mt-2 leading-tight', isRTL && 'text-right')}>{step}</p>
               </div>
@@ -52,11 +55,11 @@ export default function Submission() {
 
         <div className="space-y-4 relative z-10">
           {copy.demo.map(item => (
-            <div key={item.step} className={cn('flex gap-8 p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-white/20 transition-all', isRTL && 'flex-row-reverse text-right')}>
+            <div key={item.step} className="flex gap-8 p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-white/20 transition-all">
               <span className="text-zinc-300 font-mono font-bold text-xl opacity-60">{item.step}</span>
-              <div>
+              <div className={isRTL ? 'text-right' : ''}>
                 <h4 className="font-bold uppercase text-[10px] tracking-widest mb-1 text-zinc-400">{item.action}</h4>
-                <p className="text-zinc-400 text-sm font-medium leading-relaxed">{item.detail}</p>
+                <p className={cn('text-zinc-400 text-sm font-medium leading-relaxed', isRTL && 'text-right')}>{item.detail}</p>
               </div>
             </div>
           ))}
@@ -76,11 +79,11 @@ export default function Submission() {
       <section className="bg-white border border-zinc-100 rounded-3xl p-8 md:p-10 shadow-sm space-y-10">
         <SectionHeader icon={<Magicpen variant="Linear" color="currentColor" className="text-zinc-900" size={24} />} title={copy.aiTitle} isRTL={isRTL} />
 
-        <div className={cn('grid grid-cols-1 lg:grid-cols-2 gap-6', isRTL && 'text-right')}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {copy.aiIntegrations.map(item => (
-            <div key={item.title} className="rounded-3xl bg-zinc-50 border border-zinc-100 p-6 space-y-4">
-              <div className={cn('flex items-center justify-between gap-4', isRTL && 'flex-row-reverse')}>
-                <div className={cn('flex items-center gap-2', isRTL && 'flex-row-reverse')}>
+            <div key={item.title} className={cn('rounded-3xl bg-zinc-50 border border-zinc-100 p-6 space-y-4', isRTL && 'text-right')}>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
                   <Message variant="Linear" color="currentColor" size={14} className="text-zinc-900" />
                   <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{item.title}</h3>
                 </div>
@@ -116,7 +119,7 @@ export default function Submission() {
       <div className="flex justify-center pt-12">
         <button
           onClick={() => navigate('/')}
-          className={cn('group flex items-center gap-4 bg-zinc-950 text-white px-12 py-6 rounded-2xl font-bold uppercase text-xs tracking-widest shadow-xl hover:bg-zinc-800 transition-all active:scale-95', isRTL && 'flex-row-reverse')}
+          className="group flex items-center gap-4 bg-zinc-950 text-white px-12 py-6 rounded-2xl font-bold uppercase text-xs tracking-widest shadow-xl hover:bg-zinc-800 transition-all active:scale-95"
         >
           {copy.openApp} <ArrowRight variant="Linear" color="currentColor" size={18} className={cn('group-hover:translate-x-1 transition-transform', isRTL && 'rotate-180 group-hover:-translate-x-1')} />
         </button>
@@ -127,7 +130,7 @@ export default function Submission() {
 
 function SectionHeader({ icon, title, isRTL, dark }: { icon: React.ReactNode; title: string; isRTL: boolean; dark?: boolean }) {
   return (
-    <div className={cn('flex items-center gap-3 relative z-10', isRTL && 'flex-row-reverse text-right')}>
+    <div className="flex items-center gap-3 relative z-10">
       {icon}
       <h2 className={cn('text-2xl font-bold tracking-tight font-display', dark ? 'text-white' : 'text-zinc-900')}>{title}</h2>
     </div>
@@ -136,8 +139,8 @@ function SectionHeader({ icon, title, isRTL, dark }: { icon: React.ReactNode; ti
 
 function BriefBlock({ icon, title, body, isRTL }: { icon: React.ReactNode; title: string; body: string; isRTL: boolean }) {
   return (
-    <div className={cn('space-y-3', isRTL && 'text-right')}>
-      <h3 className={cn('text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2', isRTL && 'flex-row-reverse')}>
+    <div className="space-y-3">
+      <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
         {icon} {title}
       </h3>
       <p className="text-sm text-zinc-500 leading-relaxed font-medium">{body}</p>
@@ -148,22 +151,22 @@ function BriefBlock({ icon, title, body, isRTL }: { icon: React.ReactNode; title
 function DecisionCard({ title, body, isRTL }: { title: string; body: string; isRTL: boolean; key?: React.Key }) {
   return (
     <div className="rounded-3xl bg-zinc-50 border border-zinc-100 p-6">
-      <div className={cn('flex items-center gap-2 mb-3', isRTL && 'flex-row-reverse text-right')}>
+      <div className="flex items-center gap-2 mb-3">
         <Message variant="Linear" color="currentColor" size={14} className="text-zinc-900" />
         <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{title}</h3>
       </div>
-      <p className={cn('text-sm text-zinc-500 font-medium leading-relaxed', isRTL && 'text-right')}>{body}</p>
+      <p className="text-sm text-zinc-500 font-medium leading-relaxed">{body}</p>
     </div>
   );
 }
 
 function AiRow({ label, value, isRTL }: { label: string; value: string; isRTL: boolean }) {
   return (
-    <div className={cn('flex gap-3', isRTL && 'flex-row-reverse')}>
-      <span className={cn('w-20 shrink-0 text-[10px] font-bold text-zinc-400 uppercase tracking-widest', isRTL && 'text-right')}>
+    <div className="flex gap-3">
+      <span className="w-20 shrink-0 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
         {label}
       </span>
-      <p className={cn('text-sm text-zinc-500 font-medium leading-relaxed', isRTL && 'text-right')}>{value}</p>
+      <p className="text-sm text-zinc-500 font-medium leading-relaxed">{value}</p>
     </div>
   );
 }
@@ -194,21 +197,27 @@ function getSubmissionCopy(isRTL: boolean) {
   if (isRTL) {
     return {
       artifact: 'תיעוד הגשה',
-      title: 'SyncPro Product Brief',
-      subtitle: 'מוצר ממוקד למנהלי פרויקטים טכנולוגיים שצריכים שליטה פנימית ושקיפות חיצונית מול כמה לקוחות במקביל.',
-      productBriefTitle: '1. תקציר מוצר',
+      title: 'Product Brief: linnoproject',
+      subtitle: 'מרכז שליטה קצר וממוקד לניהול פרויקטים, משימות וחסמים מול כמה לקוחות וצוותים במקביל.',
+      productBriefTitle: 'Product Brief: linnoproject',
       problemTitle: 'בעיה',
-      problemBody: 'מנהלי פרויקט ב־Linnovate עובדים מול כמה צוותים וכמה לקוחות במקביל, אבל מתקשים להבין במהירות מה בסיכון, מה תקוע, מה דחוף, ומה נכון לתקשר החוצה.',
+      problemBody: 'מנהלי פרויקטים מבזבזים זמן על איסוף סטטוסים, הבנת חסמים וניסוח עדכונים. כשהמידע מפוזר, החלטות מתעכבות, חסמים מתגלים מאוחר, והלקוח מקבל תמונה חלקית או לא עקבית.',
       userTitle: 'משתמש יעד',
-      userBody: 'המשתמש המרכזי הוא מנהל פרויקט טכנולוגי או Delivery Lead. המשתמש המשני הוא לקוח או בעל עניין לא טכני שצריך להבין התקדמות, סיכונים והחלטות נדרשות בלי להיחשף לרעש פנימי.',
+      userBody: 'המשתמש העיקרי הוא מנהל פרויקט, Delivery Lead או מנהל חשבון טכנולוגי בארגון שירותים. הוא עובד מול כמה צוותים ולקוחות, וצריך להבין במהירות מה מתקדם, מה תקוע ומה בטוח לתקשר החוצה.',
       thesisTitle: 'הגדרת המוצר',
-      thesisBody: 'SyncPro הוא command center לניהול execution: מקום אחד שמרכז פורטפוליו, פרויקט, משימה ותקשורת, כך שה־PM יכול לעבור מזיהוי סיכון לפעולה ולעדכון לקוח באותה זרימה.',
+      thesisBody: 'linnoproject הוא מרכז שליטה לניהול execution: מקום אחד שמרכז פורטפוליו, פרויקט, משימות, חסמים ותקשורת, כך שה־PM עובר מזיהוי מצב לפעולה ולעדכון לקוח באותה זרימה.',
       mvpTitle: 'MVP מוגדר',
-      mvpBody: 'ה־MVP כולל דשבורד פורטפוליו, עמודי פרויקט, קנבן משימות, סימון חסמים, סיכום פנימי בעזרת AI, עדכון לקוח בטוח ותצוגת לקוח לקריאה בלבד. זהו הסט המינימלי שמאפשר עבודה מקצה לקצה.',
+      mvpBody: 'ה־MVP כולל דשבורד פורטפוליו, סביבת פרויקט ומשימות ב־Kanban, וסיכום/עדכון מבוססי AI. אלה מספיקים כדי לבדוק את לולאת הערך: זיהוי מצב, עדכון משימה, קבלת החלטה ותקשורת החוצה.',
       optimizationTitle: 'עבור מה בוצעה אופטימיזציה',
-      optimizationBody: 'העדיפות הראשונה היא בהירות, אחריה מהירות התמצאות, ורק אחר כך גמישות. לכן המוצר בנוי סביב סטטוסים בולטים, חסמים גלויים, והפרדה חדה בין workspace פנימי לתצוגת לקוח.',
+      optimizationBody: 'העדיפות הראשונה היא בהירות, אחריה מהירות התמצאות, ורק אחר כך גמישות. לכן linnoproject מדגיש סטטוסים, חסמים ופעולות המשך, ומפריד בין מרחב עבודה פנימי לתצוגת לקוח.',
       outTitle: 'מחוץ לתכולה',
-      outBody: 'ה־MVP לא כולל הרשאות granular, אינטגרציות חיצוניות, התראות, העלאת קבצים, תכנון קיבולת מורכב או בסיס נתונים production. אלו חשובים למוצר מלא, אבל לא משנים את לולאת הערך המרכזית שנבחנת במטלה.',
+      outBody: 'לא נבנו בשלב הראשון הרשאות מורכבות, אינטגרציות Slack/Jira/Email, אוטומציות מתקדמות, תכנון קיבולת מלא והעלאת קבצים אמיתית. כולן חשובות בהמשך, אך אינן חיוניות לאימות ערך הליבה.',
+      interactionTitle: 'אינטראקציה עם המוצר',
+      interactionBody: 'המשתמש נכנס לדשבורד, מזהה פרויקט בסיכון או משימה חסומה, נכנס לפרויקט, מעדכן סטטוס/אחראי/חסם, ומפיק סיכום פנימי או עדכון לקוח. הצלחה היא להבין מצב בתוך דקות ולצאת עם פעולה או מסר מוכן.',
+      uxTitle: 'עקרונות UX',
+      uxBody: 'בהירות לפני עומק, מינימום חיכוך, הפרדה בין פנימי לחיצוני, משוב מיידי ותחושת שליטה. כל מסך צריך להראות מה דורש תשומת לב ומה הצעד הבא.',
+      metricsTitle: 'מדדי הצלחה ראשוניים',
+      metricsBody: 'זמן מזיהוי סיכון עד פעולה ראשונה; שיעור משימות עם אחראי, דדליין וסטטוס תקין; שימוש בסיכום פנימי או עדכון לקוח; ירידה בחסמים ללא תיאור; שביעות רצון מנהלי פרויקטים.',
       workflowTitle: 'Workflow מרכזי',
       workflow: ['סריקת בריאות הפורטפוליו', 'כניסה לפרויקט בסיכון', 'עדכון משימות, בעלים וחסמים', 'יצירת סיכום פנימי למנהל הפרויקט', 'שיתוף עדכון בטוח ללקוח'],
       demoTitle: '2. מסלול הדגמה',
@@ -287,21 +296,27 @@ function getSubmissionCopy(isRTL: boolean) {
 
   return {
     artifact: 'Artifact Documentation',
-    title: 'SyncPro Product Brief',
-    subtitle: 'A focused product for technical PMs who need internal execution control and external stakeholder clarity across multiple client accounts.',
-    productBriefTitle: '1. Product Brief',
+    title: 'Product Brief: linnoproject',
+    subtitle: 'A focused command center for managing projects, tasks, blockers, and stakeholder updates across multiple client accounts.',
+    productBriefTitle: 'Product Brief: linnoproject',
     problemTitle: 'Problem',
-    problemBody: 'Project managers at Linnovate work across multiple teams and client accounts, but they do not have one fast, reliable way to see what is at risk, what is blocked, what matters now, and what can be communicated outward.',
+    problemBody: 'Project managers lose time collecting status, understanding blockers, and writing client updates. When information is scattered, decisions are delayed, risks surface late, and clients receive partial or inconsistent visibility.',
     userTitle: 'Target User',
-    userBody: 'The primary user is a technical project manager or delivery lead. The secondary user is a non-technical customer or stakeholder who needs to understand progress, risks, and required decisions without internal noise.',
+    userBody: 'The primary user is a project manager, delivery lead, or technical account owner managing several teams and clients. They need to know what is moving, what is stuck, and what can safely be communicated outward.',
     thesisTitle: 'Product Definition',
-    thesisBody: 'SyncPro is an execution command center that connects portfolio visibility, project investigation, task operations, and stakeholder communication in one flow, so a PM can move from signal to action to update without switching tools.',
+    thesisBody: 'linnoproject is an execution command center that connects portfolio visibility, project investigation, task operations, blockers, and stakeholder communication in one flow.',
     mvpTitle: 'Defined MVP',
-    mvpBody: 'The MVP includes a portfolio dashboard, project pages, a task kanban, explicit blocker tracking, internal AI summaries, customer-safe status generation, and a read-only stakeholder portal. This is the minimum useful scope for an end-to-end workflow.',
+    mvpBody: 'The MVP includes a portfolio dashboard, project/task Kanban workspace, and AI-assisted internal summaries plus customer-safe updates. This validates the core loop: identify status, update work, decide, and communicate.',
     optimizationTitle: 'Optimization Focus',
-    optimizationBody: 'The product optimizes first for clarity, then for speed of understanding, and only then for flexibility. That is why statuses, blockers, and next actions are foregrounded and the customer experience is separated from the PM workspace.',
+    optimizationBody: 'The product optimizes first for clarity, then speed, then flexibility. Status, blockers, and next actions are foregrounded, while internal PM work and customer-facing visibility remain separate.',
     outTitle: 'Out of Scope',
-    outBody: 'The MVP intentionally excludes granular permissions, external integrations, notifications, file uploads, complex capacity planning, and a production database. Those matter later, but they do not change the core learning loop being evaluated here.',
+    outBody: 'The first release excludes complex RBAC, Slack/Jira/Email integrations, advanced automations, full capacity planning, and real file hosting. These add complexity before the core product value is validated.',
+    interactionTitle: 'Product Interaction',
+    interactionBody: 'The user enters the dashboard, identifies a risky project or blocked task, opens the project, updates ownership/status/blockers, then generates an internal brief or customer update. Success means reaching clarity and action within minutes.',
+    uxTitle: 'UX Principles',
+    uxBody: 'Clarity before depth, minimal friction, separation of internal and external information, immediate feedback, and a strong sense of control. Every screen should show what needs attention and what happens next.',
+    metricsTitle: 'Initial Success Metrics',
+    metricsBody: 'Time from risk discovery to first action; share of tasks with owner, due date, and valid status; usage of internal brief/customer update; reduction of blockers without descriptions; PM satisfaction with clarity and speed.',
     workflowTitle: 'Primary Workflow',
     workflow: ['Scan portfolio health', 'Open a risky project', 'Update tasks, owners, and blockers', 'Generate an internal PM summary', 'Share a customer-safe update'],
     demoTitle: '2. Demo Walkthrough',

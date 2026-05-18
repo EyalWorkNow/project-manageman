@@ -144,40 +144,40 @@ export default function CustomerView() {
       `}</style>
 
       {/* Global Brand Navigation - Hidden in print */}
-      <nav className="px-8 py-4 border-b border-zinc-200/50 bg-white/80 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between no-print">
-        <div className="flex items-center gap-2">
+      <nav className={cn("px-8 py-4 border-b border-zinc-200/50 bg-white/80 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between no-print", isRTL && "flex-row-reverse")}>
+        <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
           <div className="w-8 h-8 bg-zinc-950 rounded-xl flex items-center justify-center shadow-sm">
             <Shield variant="Linear" color="currentColor" size={16} className="text-white" />
           </div>
-          <div className="flex flex-col">
+          <div className={cn("flex flex-col", isRTL && "text-right")}>
             <span className="text-[11px] font-bold text-zinc-950 tracking-tight">LinnoProjact</span>
             <span className="text-[8px] font-bold uppercase tracking-[0.15em] text-zinc-400">{t('customer.portal_title') || 'Stakeholder Portal'}</span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className={cn("flex items-center gap-3", isRTL && "flex-row-reverse")}>
           <button
             type="button"
             onClick={() => setLanguage(language === 'en' ? 'he' : 'en')}
-            className="flex items-center gap-2 rounded-xl border border-zinc-200/50 bg-white px-3.5 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 transition-all hover:border-zinc-300 hover:text-zinc-950 cursor-pointer"
+            className={cn("flex items-center gap-2 rounded-xl border border-zinc-200/50 bg-white px-3.5 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 transition-all hover:border-zinc-300 hover:text-zinc-950 cursor-pointer icon-action", isRTL && "flex-row-reverse")}
           >
-            <Global variant="Linear" color="currentColor" size={12} />
+            <Global variant="Linear" color="currentColor" size={12} className="icon-micro" />
             {language === 'en' ? 'עברית' : 'English'}
           </button>
           
           <button
             onClick={handleExportPDF}
-            className="flex items-center gap-2 rounded-xl bg-zinc-950 text-white px-3.5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-all cursor-pointer shadow-sm"
+            className={cn("flex items-center gap-2 rounded-xl bg-zinc-950 text-white px-3.5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-all cursor-pointer shadow-sm icon-action", isRTL && "flex-row-reverse")}
           >
-            <DocumentDownload variant="Linear" color="currentColor" size={13} />
+            <DocumentDownload variant="Linear" color="currentColor" size={13} className="icon-micro" />
             {isRTL ? 'ייצא כ-PDF' : 'Export PDF'}
           </button>
 
           <Link 
             to={`/projects/${project.id}`} 
-            className="text-[10px] font-bold text-zinc-400 hover:text-zinc-950 uppercase tracking-widest flex items-center gap-2 transition-colors ml-2"
+            className={cn("text-[10px] font-bold text-zinc-400 hover:text-zinc-950 uppercase tracking-widest flex items-center gap-2 transition-colors icon-action", isRTL ? "flex-row-reverse mr-2" : "ml-2")}
           >
             {t('customer.dev_workspace') || 'Dev Workspace'} 
-            <Export variant="Linear" color="currentColor" size={12} className={isRTL ? "scale-x-[-1]" : ""} />
+            <Export variant="Linear" color="currentColor" size={12} className={cn('icon-micro', isRTL ? "scale-x-[-1]" : "")} />
           </Link>
         </div>
       </nav>
@@ -190,9 +190,14 @@ export default function CustomerView() {
           <div className={cn("flex flex-col gap-4 md:flex-row md:items-center md:justify-between", isRTL && "md:flex-row-reverse")}>
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-[#0080EC] uppercase tracking-widest">{isRTL ? 'כיצד להשתמש בפורטל' : 'How to utilize this portal'}</span>
-              <h2 className="text-base font-bold text-zinc-950">
+              <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
+                <div className="icon-shell h-8 w-8">
+                  <People variant="Linear" color="currentColor" size={15} className="text-[#0080EC] icon-micro" />
+                </div>
+                <h2 className="text-base font-bold text-zinc-950">
                 {isRTL ? 'תצוגה עסקית מאובטחת ומסוננת ללקוח' : 'Secure client-facing stakeholder dashboard'}
-              </h2>
+                </h2>
+              </div>
               <p className="text-xs font-semibold leading-relaxed text-zinc-500">
                 {isRTL
                   ? 'ממשק זה מסונן אוטומטית. הוא מציג התקדמות משימות ולוחות זמנים ללא חשיפת הערות פנימיות של מפתחים או פרטים טכניים גולמיים.'
@@ -201,7 +206,7 @@ export default function CustomerView() {
             </div>
             <div className="shrink-0 rounded-2xl bg-zinc-950 px-4 py-3 text-white text-right print-badge-dark">
               <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider">{isRTL ? 'מצב שיתוף' : 'Security Mode'}</p>
-              <p className="text-xs font-bold mt-0.5">{isRTL ? 'בטוח ללקוח' : 'Customer-safe'}</p>
+              <p className={cn("text-xs font-bold mt-0.5", isRTL && "text-right")}>{isRTL ? 'בטוח ללקוח' : 'Customer-safe'}</p>
             </div>
           </div>
         </div>
@@ -316,7 +321,7 @@ export default function CustomerView() {
             </blockquote>
             
             <div className={cn("pt-5 border-t border-zinc-800 flex items-center justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-widest", isRTL && "flex-row-reverse")}>
-              <div className="flex items-center gap-1.5">
+              <div className={cn("flex items-center gap-1.5", isRTL && "flex-row-reverse")}>
                 <Calendar variant="Linear" color="currentColor" size={13} className="text-[#0080EC]" />
                 <span>{t('customer.target_date') || 'Delivery Deadline'}: {formatDate(project.deadline)}</span>
               </div>
@@ -328,7 +333,7 @@ export default function CustomerView() {
         {/* Detailed Milestones & Active Roadmaps */}
         <div className="space-y-8">
           <div className={cn("flex items-center justify-between border-b border-zinc-200/60 pb-3", isRTL && "flex-row-reverse")}>
-            <div className="flex items-center gap-2">
+            <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
               <TaskIcon variant="Linear" color="currentColor" size={15} className="text-[#0080EC]" />
               <h2 className="text-lg font-bold text-zinc-950 tracking-tight font-display">
                 {isRTL ? 'מפת דרכים ויעדים פעילים' : 'Roadmap & Active Deliverables'}
@@ -429,7 +434,7 @@ interface StatusTileProps {
 function StatusTile({ label, count, icon, highlighted, risk, isRTL }: StatusTileProps) {
   return (
     <div className={cn(
-      "p-5 bg-white rounded-2xl border flex items-center justify-between shadow-sm transition-all duration-300 print-card",
+      "p-5 bg-white rounded-2xl border flex items-center justify-between shadow-sm transition-all duration-300 print-card icon-action",
       highlighted ? "border-amber-200 bg-amber-50/20" : 
       risk ? "border-red-200 bg-red-50/20" : "border-zinc-200/60",
       isRTL && "flex-row-reverse"
@@ -439,10 +444,10 @@ function StatusTile({ label, count, icon, highlighted, risk, isRTL }: StatusTile
          <div className={cn("text-2xl font-black text-zinc-950 tabular-nums", isRTL && "text-right")}>{count}</div>
        </div>
        <div className={cn(
-          "p-2.5 rounded-xl shrink-0",
+          "p-2.5 rounded-xl shrink-0 transition-transform duration-200",
           highlighted ? "bg-amber-100/60 text-amber-600" : risk ? "bg-red-100/60 text-red-600" : "bg-[#F8F9FD] text-[#0080EC]"
        )}>
-         {icon}
+         <span className="icon-micro">{icon}</span>
        </div>
     </div>
   );

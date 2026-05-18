@@ -166,16 +166,16 @@ export default function Dashboard() {
             <div className={cn('flex gap-3', isRTL && 'flex-row-reverse')}>
               <Link
                 to="/ai-chat"
-                className="flex items-center gap-2 px-5 py-2.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 rounded-2xl text-xs font-semibold transition-all cursor-pointer"
+                className={cn('flex items-center gap-2 px-5 py-2.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 rounded-2xl text-xs font-semibold transition-all cursor-pointer icon-action', isRTL && 'flex-row-reverse')}
               >
-                <Flash variant="Linear" color="currentColor" size={14} className="text-zinc-900" />
+                <Flash variant="Linear" color="currentColor" size={14} className="text-zinc-900 icon-micro" />
                 {isRTL ? 'שאל AI' : 'Ask AI'}
               </Link>
               <Link
                 to="/projects/new"
-                className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl text-xs font-semibold transition-all shadow-sm cursor-pointer"
+                className={cn('flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl text-xs font-semibold transition-all shadow-sm cursor-pointer icon-action', isRTL && 'flex-row-reverse')}
               >
-                <AddCircle variant="Linear" color="currentColor" size={14} />
+                <AddCircle variant="Linear" color="currentColor" size={14} className="icon-micro" />
                 {isRTL ? 'פרויקט חדש' : 'New Project'}
               </Link>
             </div>
@@ -218,6 +218,9 @@ export default function Dashboard() {
               {/* Portfolio header */}
               <div className={cn('px-6 py-5 border-b border-zinc-200/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4', isRTL && 'text-right')}>
                 <div className={cn('flex items-center gap-4', isRTL && 'flex-row-reverse')}>
+                  <div className="icon-shell h-8 w-8">
+                    <Folder2 variant="Linear" color="currentColor" size={15} className="icon-micro text-zinc-800" />
+                  </div>
                   <h2 className="text-lg font-semibold text-zinc-900 tracking-tight">{isRTL ? 'פורטפוליו' : 'Portfolio'}</h2>
                   <div className="relative">
                     <SearchNormal1 variant="Linear" color="currentColor" className={cn('absolute top-1/2 -translate-y-1/2 text-zinc-400', isRTL ? 'right-2.5' : 'left-2.5')} size={13} />
@@ -235,6 +238,9 @@ export default function Dashboard() {
                 </div>
                 <div className={cn('flex items-center gap-3 w-full md:w-auto min-w-0', isRTL && 'flex-row-reverse')}>
                   <div className="flex items-center gap-1 p-1 bg-zinc-50/80 rounded-xl border border-zinc-200/60 overflow-x-auto w-full md:w-auto min-w-0 no-scrollbar">
+                    <div className="px-2 text-zinc-400 shrink-0">
+                      <Filter variant="Linear" color="currentColor" size={13} className="icon-micro" />
+                    </div>
                     <button
                       onClick={() => setViewType('all')}
                       className={cn(

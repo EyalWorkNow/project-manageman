@@ -193,9 +193,10 @@ function Navigation({ mobileOpen, onClose, onSignOut }: { mobileOpen: boolean; o
     <>
       {/* Desktop sidebar */}
       <aside className={cn(
-        'hidden md:flex flex-col fixed top-0 bottom-0 w-64 bg-zinc-950 z-40 border-r border-zinc-800',
+        'hidden md:flex flex-col fixed top-0 bottom-0 w-64 bg-zinc-950 z-40',
         isRTL ? 'right-0 border-r-0 border-l' : 'left-0'
-      )}>
+      )}
+      style={{ insetInlineStart: 0, insetInlineEnd: 'auto' }}>
         {navContent}
       </aside>
 
@@ -203,7 +204,10 @@ function Navigation({ mobileOpen, onClose, onSignOut }: { mobileOpen: boolean; o
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-          <aside className={cn('relative w-72 bg-zinc-950 flex flex-col z-10', isRTL ? 'ml-auto' : '')}>
+          <aside
+            className={cn('absolute top-0 bottom-0 w-72 bg-zinc-950 flex flex-col z-10', isRTL ? 'right-0' : 'left-0')}
+            style={{ insetInlineStart: 0, insetInlineEnd: 'auto' }}
+          >
             {navContent}
           </aside>
         </div>
@@ -214,11 +218,15 @@ function Navigation({ mobileOpen, onClose, onSignOut }: { mobileOpen: boolean; o
 
 function MobileTopBar({ onMenuOpen }: { onMenuOpen: () => void }) {
   const location = useLocation();
+  const { isRTL } = useI18n();
   const isCustomerView = location.pathname.includes('customer-view');
   if (isCustomerView) return null;
 
   return (
-    <div className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-5 py-4 bg-zinc-950/80 backdrop-blur-xl border-b border-white/5">
+    <div className={cn(
+      'md:hidden fixed top-0 inset-x-0 z-30 flex items-center justify-between px-5 py-4 bg-zinc-950/80 backdrop-blur-xl border-b border-white/5',
+      isRTL && 'flex-row-reverse'
+    )}>
       <div className="flex items-center gap-3">
         <img src="/logo.svg" alt="LinnoProjact Logo" className="h-5 object-contain" />
       </div>
@@ -236,12 +244,12 @@ function Layout({ children, onSignOut }: { children: React.ReactNode; onSignOut:
   const isCustomerView = location.pathname.includes('customer-view');
 
   return (
-    <div className={cn('min-h-screen bg-[#F6F7FB] flex text-zinc-900', isRTL && 'rtl')}>
+    <div className={cn('min-h-screen bg-[#F6F7FB] flex text-zinc-900', isRTL && 'rtl flex-row-reverse')}>
       <Navigation mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} onSignOut={onSignOut} />
       <MobileTopBar onMenuOpen={() => setMobileOpen(true)} />
       <main className={cn(
         'flex-1 min-w-0',
-        !isCustomerView && (isRTL ? 'md:mr-64' : 'md:ml-64'),
+        !isCustomerView && 'md:ms-64',
         'pt-14 md:pt-0'
       )}>
         <div className="max-w-[1600px] mx-auto">

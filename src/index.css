@@ -58,6 +58,14 @@
   .btn-primary { @apply bg-zinc-900 text-white rounded-2xl px-5 py-2.5 font-semibold text-sm transition-all hover:bg-zinc-800 active:scale-95 cursor-pointer shadow-sm; }
   .btn-secondary { @apply bg-white text-zinc-700 rounded-2xl px-5 py-2.5 font-semibold text-sm border border-zinc-200/50 transition-all hover:bg-zinc-50 active:scale-95 cursor-pointer shadow-sm; }
   .input-field { @apply bg-zinc-50 w-full px-4 py-3 rounded-2xl border border-zinc-200/50 text-sm text-zinc-900 focus:outline-none focus:bg-white focus:border-zinc-300 focus:ring-4 focus:ring-zinc-100 transition-all; }
+  .icon-action { @apply transition-all duration-200; }
+  .icon-micro { @apply transition-all duration-200 ease-out; }
+  .icon-shell { @apply inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-zinc-200/70 bg-zinc-100 text-zinc-700 shadow-sm transition-all duration-200; }
+  .icon-shell-dark { @apply inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white shadow-sm transition-all duration-200; }
+  .label-with-icon { @apply flex items-center gap-2 text-sm font-semibold text-zinc-900 mb-1.5; }
+  .icon-action:hover .icon-shell { @apply -translate-y-0.5 border-zinc-300 bg-white text-zinc-950; }
+  .icon-action:hover .icon-shell-dark { @apply -translate-y-0.5 bg-white/15 text-white; }
+  .icon-action:hover .icon-micro { transform: translateY(-1px) scale(1.06); }
   .chat-bubble-user { background: #0073EA; }
   .chat-bubble-ai { background: white; border: 1px solid #E6E9EF; }
   .typing-dot { animation: typing-bounce 1.4s infinite ease-in-out; }
